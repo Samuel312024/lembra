@@ -1,0 +1,37 @@
+name: lembra
+description: Lembretes e organização do dia a dia por voz.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any
+  flutter_riverpod: ^2.5.1
+  sqflite: ^2.3.3
+  path: ^1.9.0
+  shared_preferences: ^2.2.3
+  flutter_secure_storage: ^9.2.2
+  http: ^1.2.1
+  uuid: ^4.4.0
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.0.2
+  flutter_local_notifications: ^19.0.0
+  timezone: ^0.10.0
+  flutter_timezone: ^5.1.1
+  google_fonts: ^9.0.0
+  flutter_animate: ^4.5.2
+  flutter_slidable: ^4.0.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
