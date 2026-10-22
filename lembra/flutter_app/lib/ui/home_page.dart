@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../domain/draft.dart';
 import '../domain/item.dart';
+import '../services/alarme_nativo.dart';
 import '../services/notification_service.dart';
 import '../state/providers.dart';
 import 'agenda.dart';
@@ -44,6 +45,8 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
   void didChangeAppLifecycleState(AppLifecycleState estado) {
     if (estado == AppLifecycleState.resumed) {
       ref.read(itemsProvider.notifier).aoRetomar();
+      // Alarme tocando enquanto o app estava em segundo plano → volta para a tela cheia.
+      NotificationService.instance.verificarAlarmeTocando();
     }
   }
 
@@ -59,6 +62,35 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
     await ref.read(itemsProvider.notifier).aoRetomar();
     await notif.verificarLancamento();
     if (mounted) await _permissoesGuiadas();
+    if (mounted) await _sobreposicaoGuiada();
+  }
+
+  /// "Exibir sobre outros apps": é o que permite o alarme abrir em tela cheia por cima
+  /// de qualquer app, com o celular desbloqueado. Perguntamos uma vez, explicando o motivo.
+  Future<void> _sobreposicaoGuiada() async {
+    final nativo = AlarmeNativo.instance;
+    if (!nativo.disponivel || await nativo.temSobreposicao()) return;
+    final prefs = ref.read(prefsProvider);
+    if (prefs.getBool('sobreposicao_pedida') ?? false) return;
+    if (!mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Alarme por cima de tudo'),
+        content: const Text(
+          'Para o alarme crítico abrir em tela cheia e tocar mesmo quando você está usando outro app '
+          'ou com o celular desbloqueado, o Android precisa da permissão “Exibir sobre outros apps”.\n\n'
+          'Na próxima tela, escolha o Lembra e ative a opção.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Depois')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Abrir ajustes')),
+        ],
+      ),
+    );
+    await prefs.setBool('sobreposicao_pedida', true);
+    if (ok == true) await nativo.pedirSobreposicao();
   }
 
   /// Na primeira abertura, explica por que as permissões são necessárias antes de pedir.

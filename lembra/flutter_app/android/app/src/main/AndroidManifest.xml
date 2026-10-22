@@ -1,8 +1,40 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Rede: obrigatória em release para falar com o backend. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Voz: microfone para criar lembretes falando. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+
+    <!-- Notificações (Android 13+): o PermissionGate exige esta permissão. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <!-- Alarme exato (Android 12+): o lembrete toca no minuto certo. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+
+    <!-- Alarme aparece na tela cheia, inclusive com o celular bloqueado. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
+
+    <!-- Alarme abre por cima de qualquer app, mesmo com o celular desbloqueado. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+
+    <!-- Serviço que toca o som do alarme em loop. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+
+    <!-- Vibração do alarme e wake lock para acordar o aparelho. -->
+    <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+
+    <!-- Reagenda os lembretes depois que o celular reinicia. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+
     <application
         android:label="lembra"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- showWhenLocked/turnScreenOn foram removidos daqui: o MainActivity.kt
+             liga isso só enquanto o alarme está tocando. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -25,12 +57,62 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <!-- Alarme crítico (código nativo): toca o som, acende a tela e abre o app. -->
+        <service
+            android:name=".AlarmeService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback"/>
+
+        <!-- Alarme crítico: recebe o disparo do AlarmManager na hora exata. -->
+        <receiver
+            android:name=".AlarmeReceiver"
+            android:exported="false"/>
+
+        <!-- Alarme crítico: rearma os alarmes depois de reiniciar o celular ou mudar a hora. -->
+        <receiver
+            android:name=".AlarmeBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.TIME_SET"/>
+                <action android:name="android.intent.action.TIMEZONE_CHANGED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+
+        <!-- flutter_local_notifications: dispara os lembretes agendados. -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false"/>
+
+        <!-- flutter_local_notifications: reagenda depois de reiniciar o celular
+             ou de atualizar o app. -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+
+        <!-- flutter_local_notifications: botões das notificações (soneca,
+             concluir) funcionando com o app fechado. -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver"
+            android:exported="false"/>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
+
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
          https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
@@ -40,6 +122,10 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Reconhecimento de voz (Android 11+ exige declarar). -->
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
         </intent>
     </queries>
 </manifest>
