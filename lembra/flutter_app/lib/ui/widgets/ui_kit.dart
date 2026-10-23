@@ -211,6 +211,7 @@ class StatCard extends StatelessWidget {
     required this.value,
     required this.valueColor,
     required this.caption,
+    this.onTap,
   });
 
   final IconData icon;
@@ -220,19 +221,36 @@ class StatCard extends StatelessWidget {
   final Color valueColor;
   final String caption;
 
+  /// Quando informado, o card vira um botão (com uma setinha no canto).
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
 
     return AppCard(
+      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          IconBadge(icon: icon, color: iconColor, size: 40),
+          Row(
+            children: [
+              IconBadge(icon: icon, color: iconColor, size: 40),
+              if (onTap != null) ...[
+                const Spacer(),
+                const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+              ],
+            ],
+          ),
           const SizedBox(height: 12),
           Text(label, style: t.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          Text(value, style: AppText.mono(size: 24, color: valueColor)),
+          // Valores em reais são longos: encolhem para caber em vez de quebrar a linha.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value, maxLines: 1, style: AppText.mono(size: 24, color: valueColor)),
+          ),
           const SizedBox(height: 4),
           Text(caption, style: t.bodySmall?.copyWith(color: AppColors.muted)),
         ],

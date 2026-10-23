@@ -11,7 +11,7 @@ class ItemRepository {
   Future<Database> get _banco async {
     return _db ??= await openDatabase(
       p.join(await getDatabasesPath(), 'lembra.db'),
-      version: 1,
+      version: 2,
       onCreate: (db, versao) async {
         await db.execute('''
           CREATE TABLE itens (
@@ -27,12 +27,21 @@ class ItemRepository {
             origem TEXT NOT NULL,
             responsavel TEXT NOT NULL,
             soneca INTEGER NOT NULL DEFAULT 0,
+            valor REAL,
+            categoria TEXT,
             concluido_em INTEGER,
             criado_em INTEGER NOT NULL,
             atualizado_em INTEGER NOT NULL,
             dirty INTEGER NOT NULL DEFAULT 1
           )
         ''');
+      },
+      // v2: valor e tipo das contas. Quem já tem o app instalado só ganha as colunas.
+      onUpgrade: (db, antiga, nova) async {
+        if (antiga < 2) {
+          await db.execute('ALTER TABLE itens ADD COLUMN valor REAL');
+          await db.execute('ALTER TABLE itens ADD COLUMN categoria TEXT');
+        }
       },
     );
   }

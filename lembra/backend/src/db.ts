@@ -33,6 +33,8 @@ db.exec(`
     origem TEXT NOT NULL,
     responsavel TEXT NOT NULL,
     soneca INTEGER NOT NULL DEFAULT 0,
+    valor REAL,
+    categoria TEXT,
     concluido_em INTEGER,
     criado_em INTEGER NOT NULL,
     atualizado_em INTEGER NOT NULL,
@@ -47,3 +49,11 @@ db.exec(`
     PRIMARY KEY (usuario_id, dia)
   );
 `);
+
+// Migração: bancos criados antes de "valor" e "categoria" (contas a pagar) ganham as colunas.
+// O SQLite não tem ADD COLUMN IF NOT EXISTS, então confere antes.
+const colunasItens = (db.prepare('PRAGMA table_info(itens)').all() as unknown as { name: string }[]).map(
+  (c) => c.name,
+);
+if (!colunasItens.includes('valor')) db.exec('ALTER TABLE itens ADD COLUMN valor REAL');
+if (!colunasItens.includes('categoria')) db.exec('ALTER TABLE itens ADD COLUMN categoria TEXT');

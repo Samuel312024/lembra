@@ -1,5 +1,6 @@
 import 'package:uuid/uuid.dart';
 
+import 'categoria_conta.dart';
 import 'item.dart';
 import 'recorrencia.dart';
 
@@ -25,6 +26,8 @@ class Draft {
     this.ambiguidade = Ambiguidade.nenhuma,
     this.alternativaData,
     this.horarioPadrao = false,
+    this.valor,
+    this.categoria,
   })  : antecedencias = antecedencias ?? antecedenciasPadrao(tipo),
         camposFaltando = camposFaltando ?? [];
 
@@ -42,6 +45,8 @@ class Draft {
   Ambiguidade ambiguidade;
   DateTime? alternativaData; // outra data possível quando há ambiguidade
   bool horarioPadrao; // o horário foi preenchido com o padrão do usuário
+  double? valor; // só para contas: valor em reais
+  CategoriaConta? categoria; // só para contas: água, luz, ...
 
   /// Antecedências padrão por tipo (spec 4.4).
   static List<int> antecedenciasPadrao(TipoItem t) {
@@ -69,6 +74,8 @@ class Draft {
         urgencia: i.urgencia,
         responsavel: i.responsavel,
         origem: i.origem,
+        valor: i.valor,
+        categoria: i.categoria,
       );
 
   bool get usaPrazo => tipo == TipoItem.tarefa || tipo == TipoItem.conta;
@@ -108,6 +115,8 @@ class Draft {
       urgencia: urgencia,
       origem: origem,
       responsavel: responsavel,
+      valor: tipo == TipoItem.conta ? valor : null,
+      categoria: tipo == TipoItem.conta ? categoria : null,
       criadoEm: t,
       atualizadoEm: t,
     );
@@ -124,6 +133,9 @@ class Draft {
     i.antecedencias = List.of(antecedencias);
     i.urgencia = urgencia;
     i.responsavel = responsavel;
+    // Valor e tipo só existem em contas; ao mudar para outro tipo, somem.
+    i.valor = tipo == TipoItem.conta ? valor : null;
+    i.categoria = tipo == TipoItem.conta ? categoria : null;
     i.soneca = 0;
     i.atualizadoEm = DateTime.now();
     i.dirty = true;
@@ -172,6 +184,8 @@ class Draft {
       origem: origem,
       camposFaltando: ((j['campos_faltando'] as List?) ?? const []).map((e) => '$e').toList(),
       confianca: (j['confianca'] as num?)?.toDouble() ?? 0.5,
+      valor: (j['valor'] is num && (j['valor'] as num) > 0) ? (j['valor'] as num).toDouble() : null,
+      categoria: categoriaContaDoNome(j['categoria']),
     );
     d.inicio = data(j['inicio']);
     d.prazo = data(j['prazo']);

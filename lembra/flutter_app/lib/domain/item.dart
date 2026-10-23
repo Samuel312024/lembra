@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'categoria_conta.dart';
 import 'recorrencia.dart';
 
 enum TipoItem { compromisso, tarefa, habito, conta }
@@ -53,6 +54,8 @@ class Item {
     this.origem = Origem.voz,
     this.responsavel = 'eu',
     this.soneca = 0,
+    this.valor,
+    this.categoria,
     this.concluidoEm,
     required this.criadoEm,
     required this.atualizadoEm,
@@ -71,6 +74,8 @@ class Item {
   Origem origem;
   String responsavel;
   int soneca; // quantas vezes o alarme foi adiado
+  double? valor; // só para contas: valor em reais
+  CategoriaConta? categoria; // só para contas: água, luz, ...
   DateTime? concluidoEm;
   DateTime criadoEm;
   DateTime atualizadoEm;
@@ -106,6 +111,8 @@ class Item {
         origem: origem,
         responsavel: responsavel,
         soneca: soneca,
+        valor: valor,
+        categoria: categoria,
         concluidoEm: concluidoEm,
         criadoEm: criadoEm,
         atualizadoEm: atualizadoEm,
@@ -133,6 +140,8 @@ class Item {
         'origem': origem.name,
         'responsavel': responsavel,
         'soneca': soneca,
+        'valor': valor,
+        'categoria': categoria?.name,
         'concluido_em': concluidoEm?.millisecondsSinceEpoch,
         'criado_em': criadoEm.millisecondsSinceEpoch,
         'atualizado_em': atualizadoEm.millisecondsSinceEpoch,
@@ -154,6 +163,8 @@ class Item {
       origem: _enumPor(Origem.values, m['origem'], Origem.voz),
       responsavel: (m['responsavel'] as String?) ?? 'eu',
       soneca: (m['soneca'] as num?)?.toInt() ?? 0,
+      valor: (m['valor'] as num?)?.toDouble(),
+      categoria: categoriaContaDoNome(m['categoria']),
       concluidoEm: _dt(m['concluido_em']),
       criadoEm: _dt(m['criado_em'])!,
       atualizadoEm: _dt(m['atualizado_em'])!,

@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../domain/categoria_conta.dart';
+import '../domain/dinheiro.dart';
 import '../domain/draft.dart';
 import '../domain/item.dart';
 import '../domain/recorrencia.dart';
 import 'agenda.dart';
+import 'item_tile.dart' show iconeDaCategoria;
 
 enum _Rep { nenhuma, diaria, uteis, semanal, mensal }
 
@@ -22,6 +26,9 @@ class _ItemFormPageState extends State<ItemFormPage> {
   final _chave = GlobalKey<FormState>();
   late final Draft d = widget.rascunho ?? Draft.vazio();
   late final TextEditingController _titulo = TextEditingController(text: d.titulo);
+  late final TextEditingController _valor = TextEditingController(
+    text: d.valor == null ? '' : d.valor!.toStringAsFixed(2).replaceAll('.', ','),
+  );
   late _Rep _rep;
   late Set<int> _dias;
 
@@ -57,6 +64,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
   @override
   void dispose() {
     _titulo.dispose();
+    _valor.dispose();
     super.dispose();
   }
 
@@ -109,6 +117,13 @@ class _ItemFormPageState extends State<ItemFormPage> {
   void _salvar() {
     if (!_chave.currentState!.validate()) return;
     d.titulo = _titulo.text.trim();
+    if (d.tipo == TipoItem.conta) {
+      d.valor = lerReais(_valor.text);
+    } else {
+      // Valor e tipo de conta só existem em contas.
+      d.valor = null;
+      d.categoria = null;
+    }
     if (_rep == _Rep.semanal && _dias.isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Escolha ao menos um dia da semana.')));
@@ -117,6 +132,48 @@ class _ItemFormPageState extends State<ItemFormPage> {
     _aplicarRecorrencia();
     Navigator.of(context).pop(d);
   }
+
+  /// Tipo da conta (água, luz, ...) e valor em reais: só aparecem para contas.
+  List<Widget> _camposConta() => [
+        const SizedBox(height: 16),
+        DropdownButtonFormField<CategoriaConta>(
+          value: d.categoria,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'Tipo de conta', border: OutlineInputBorder()),
+          hint: const Text('Selecione o tipo de conta'),
+          items: [
+            for (final c in CategoriaConta.values)
+              DropdownMenuItem(
+                value: c,
+                child: Row(
+                  children: [
+                    Icon(iconeDaCategoria(c), size: 20),
+                    const SizedBox(width: 12),
+                    Text(c.rotulo),
+                  ],
+                ),
+              ),
+          ],
+          onChanged: (c) => setState(() {
+            d.categoria = c;
+            // Ajuda: se o título ainda está vazio, sugere um nome para a conta.
+            if (c != null && _titulo.text.trim().isEmpty) _titulo.text = c.tituloSugerido;
+          }),
+        ),
+        const SizedBox(height: 16),
+        TextFormField(
+          controller: _valor,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
+          decoration: const InputDecoration(
+            labelText: 'Valor da conta',
+            prefixText: r'R$ ',
+            hintText: '0,00',
+            border: OutlineInputBorder(),
+          ),
+          validator: (v) => (v == null || v.trim().isEmpty || lerReais(v) != null) ? null : 'Valor inválido',
+        ),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -151,6 +208,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
               decoration: const InputDecoration(labelText: 'O quê', border: OutlineInputBorder()),
               validator: (v) => (v == null || v.trim().isEmpty) ? 'Dê um nome ao lembrete' : null,
             ),
+            if (d.tipo == TipoItem.conta) ..._camposConta(),
             const SizedBox(height: 16),
             Row(
               children: [

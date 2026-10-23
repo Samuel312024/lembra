@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../app.dart';
+import '../domain/categoria_conta.dart';
+import '../domain/dinheiro.dart';
 import '../domain/draft.dart';
 import '../domain/item.dart';
 import '../domain/recorrencia.dart';
 import '../nlp/comandos.dart';
 import 'agenda.dart';
 import 'item_form_page.dart';
+import 'item_tile.dart' show iconeDaCategoria;
 import 'voice_sheet.dart';
 
 /// Cartão de confirmação: mostra o que foi entendido. Nada é agendado sem
@@ -73,6 +76,12 @@ class _CartaoState extends State<_Cartao> {
     if (m % 1440 == 0) return '${m ~/ 1440} dia${m ~/ 1440 > 1 ? 's' : ''} antes';
     if (m % 60 == 0) return '${m ~/ 60} h antes';
     return '$m min antes';
+  }
+
+  String _textoConta() {
+    final tipo = d.categoria?.rotulo ?? 'Tipo de conta não informado';
+    final valor = d.valor == null ? 'valor não informado' : formatarReais(d.valor!);
+    return '$tipo • $valor';
   }
 
   Future<void> _alterarQuando() async {
@@ -157,6 +166,9 @@ class _CartaoState extends State<_Cartao> {
       out.add('Sem data: o item ficará só na lista, sem alarme.');
     }
     if (!_temHorario && !d.horarioPadrao) out.add('Falta o horário.');
+    if (d.tipo == TipoItem.conta && d.valor == null) {
+      out.add('Conta sem valor: toque em “Informar” para ela entrar no total.');
+    }
     if (d.confianca < 0.6) out.add('Não tenho certeza do que entendi — confira antes de confirmar.');
     return out;
   }
@@ -212,6 +224,13 @@ class _CartaoState extends State<_Cartao> {
             const SizedBox(height: 8),
             _linha(Icons.event_outlined, _textoQuando(), acao: _alterarQuando),
             if (rec != null) _linha(Icons.repeat, rec.descricao),
+            if (d.tipo == TipoItem.conta)
+              _linha(
+                d.categoria == null ? Icons.receipt_long_outlined : iconeDaCategoria(d.categoria!),
+                _textoConta(),
+                acao: _editar,
+                rotulo: (d.categoria == null || d.valor == null) ? 'Informar' : 'Alterar',
+              ),
             _linha(Icons.notifications_active_outlined, _textoAvisos()),
             const SizedBox(height: 8),
             SegmentedButton<Urgencia>(

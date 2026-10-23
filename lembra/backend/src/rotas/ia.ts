@@ -31,6 +31,8 @@ const itemIA = z.object({
   origem: z.enum(['voz', 'texto', 'reuniao']),
   campos_faltando: z.array(z.string()).default([]),
   confianca: z.number().min(0).max(1),
+  valor: z.number().min(0).max(1_000_000_000).nullable().default(null),
+  categoria: z.string().max(30).nullable().default(null),
 });
 
 const SISTEMA = `Você converte falas em português do Brasil em itens de lembrete/agenda.
@@ -48,6 +50,8 @@ Formato de cada objeto:
   "urgencia": "discreto | normal | critico",
   "responsavel": "eu",
   "origem": "voz",
+  "valor": null,
+  "categoria": null,
   "campos_faltando": [],
   "confianca": 0.0
 }
@@ -66,7 +70,11 @@ Regras:
 - antecedencias_minutos padrão: compromisso [1440,120,30]; tarefa com prazo [60,0]; conta [2880,0]; habito [0].
   Se o usuário pedir ("me avisa um dia antes"), use [1440,0].
 - urgencia: "critico" para remédio ou quando disser urgente/importante/não pode esquecer; "discreto" se pedir silêncio; senão "normal".
-- confianca de 0 a 1: baixe quando faltar dado essencial ou a fala for ambígua.`;
+- confianca de 0 a 1: baixe quando faltar dado essencial ou a fala for ambígua.
+- valor e categoria só para tipo conta (nos outros tipos, sempre null). valor = quanto é a conta, em reais, como número
+  (150.5), sem "R$"; null se o usuário não disse. O valor NÃO entra no titulo.
+  categoria = agua | luz | gas | internet | telefone | aluguel | condominio | cartao | financiamento | impostos | saude
+  | educacao | assinaturas | outros; null se não der para saber.`;
 
 export async function rotasIa(app: FastifyInstance) {
   app.post('/ia/entender', { preHandler: [app.autenticar] }, async (req, reply) => {

@@ -17,6 +17,8 @@ const itemEsquema = z.object({
   origem: z.enum(['voz', 'texto', 'reuniao']),
   responsavel: z.string().max(100).default('eu'),
   soneca: z.number().int().min(0).default(0),
+  valor: z.number().min(0).max(1_000_000_000).nullable().optional(),
+  categoria: z.string().max(30).nullable().optional(),
   concluido_em: ms,
   criado_em: z.number().int(),
   atualizado_em: z.number().int(),
@@ -34,13 +36,14 @@ export async function rotasSync(app: FastifyInstance) {
   // impede que um usuário sobrescreva o item de outro usando o mesmo id.
   const upsert = db.prepare(`
     INSERT INTO itens (id, usuario_id, tipo, titulo, inicio, prazo, recorrencia, antecedencias,
-      urgencia, status, origem, responsavel, soneca, concluido_em, criado_em, atualizado_em, servidor_em)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      urgencia, status, origem, responsavel, soneca, valor, categoria, concluido_em, criado_em, atualizado_em, servidor_em)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       tipo = excluded.tipo, titulo = excluded.titulo, inicio = excluded.inicio, prazo = excluded.prazo,
       recorrencia = excluded.recorrencia, antecedencias = excluded.antecedencias,
       urgencia = excluded.urgencia, status = excluded.status, origem = excluded.origem,
-      responsavel = excluded.responsavel, soneca = excluded.soneca, concluido_em = excluded.concluido_em,
+      responsavel = excluded.responsavel, soneca = excluded.soneca, valor = excluded.valor,
+      categoria = excluded.categoria, concluido_em = excluded.concluido_em,
       atualizado_em = excluded.atualizado_em, servidor_em = excluded.servidor_em
     WHERE itens.usuario_id = excluded.usuario_id AND itens.atualizado_em < excluded.atualizado_em
   `);
@@ -67,6 +70,8 @@ export async function rotasSync(app: FastifyInstance) {
           i.origem,
           i.responsavel,
           i.soneca,
+          i.valor ?? null,
+          i.categoria ?? null,
           i.concluido_em ?? null,
           i.criado_em,
           i.atualizado_em,

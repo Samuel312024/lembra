@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../app.dart';
+import '../domain/categoria_conta.dart';
+import '../domain/dinheiro.dart';
 import '../domain/item.dart';
 import 'agenda.dart';
 import 'theme/app_theme.dart';
@@ -13,6 +15,29 @@ IconData iconeDoTipo(TipoItem t) => switch (t) {
       TipoItem.habito => Icons.repeat,
       TipoItem.conta => Icons.receipt_long_outlined,
     };
+
+/// Ícone de cada tipo de conta (água, luz, ...).
+IconData iconeDaCategoria(CategoriaConta c) => switch (c) {
+      CategoriaConta.agua => Icons.water_drop_outlined,
+      CategoriaConta.luz => Icons.bolt_outlined,
+      CategoriaConta.gas => Icons.local_fire_department_outlined,
+      CategoriaConta.internet => Icons.wifi_rounded,
+      CategoriaConta.telefone => Icons.phone_android_outlined,
+      CategoriaConta.aluguel => Icons.home_outlined,
+      CategoriaConta.condominio => Icons.apartment_outlined,
+      CategoriaConta.cartao => Icons.credit_card_outlined,
+      CategoriaConta.financiamento => Icons.account_balance_outlined,
+      CategoriaConta.impostos => Icons.receipt_long_outlined,
+      CategoriaConta.saude => Icons.health_and_safety_outlined,
+      CategoriaConta.educacao => Icons.school_outlined,
+      CategoriaConta.assinaturas => Icons.subscriptions_outlined,
+      CategoriaConta.outros => Icons.more_horiz_rounded,
+    };
+
+/// Conta com tipo definido usa o ícone do tipo; os demais usam o ícone do item.
+IconData _icone(Item item) => (item.tipo == TipoItem.conta && item.categoria != null)
+    ? iconeDaCategoria(item.categoria!)
+    : iconeDoTipo(item.tipo);
 
 /// Cor do quadradinho do ícone, por tipo de item.
 Color corDoTipo(TipoItem t) => switch (t) {
@@ -36,6 +61,12 @@ String subtituloDoItem(Item item, DateTime agora) {
 
 /// Texto de apoio sem o horário (o horário aparece à direita, em destaque).
 String _meta(Item item, DateTime agora) {
+  final base = _metaData(item, agora);
+  final c = item.tipo == TipoItem.conta ? item.categoria : null;
+  return c == null ? base : '${c.rotulo} • $base';
+}
+
+String _metaData(Item item, DateTime agora) {
   final r = item.regra;
   if (r != null) return r.descricao;
   final a = item.ancora;
@@ -78,6 +109,7 @@ class ItemTile extends StatelessWidget {
     final critico = item.urgencia == Urgencia.critico;
     final atrasado = !feito && item.regra == null && (a?.isBefore(agora) ?? false);
     final temHora = a != null && (a.hour != 0 || a.minute != 0);
+    final mostraValor = item.tipo == TipoItem.conta && item.valor != null;
     final destaque = critico && !feito;
 
     final cartao = Padding(
@@ -100,7 +132,7 @@ class ItemTile extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Row(
                 children: [
-                  IconBadge(icon: iconeDoTipo(item.tipo), color: corDoTipo(item.tipo)),
+                  IconBadge(icon: _icone(item), color: corDoTipo(item.tipo)),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -135,10 +167,20 @@ class ItemTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  if (temHora)
-                    Text(
-                      DateFormat.Hm('pt_BR').format(a),
-                      style: AppText.mono(size: 15),
+                  if (mostraValor || temHora)
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (mostraValor) Text(formatarReais(item.valor!), style: AppText.mono(size: 14)),
+                        if (temHora)
+                          Text(
+                            DateFormat.Hm('pt_BR').format(a),
+                            style: mostraValor
+                                ? AppText.mono(size: 12, weight: FontWeight.w500, color: AppColors.muted)
+                                : AppText.mono(size: 15),
+                          ),
+                      ],
                     ),
                   if (feito)
                     const Padding(

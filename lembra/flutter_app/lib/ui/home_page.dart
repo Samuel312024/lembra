@@ -3,14 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../domain/dinheiro.dart';
 import '../domain/draft.dart';
 import '../domain/item.dart';
-import '../services/alarme_nativo.dart';
 import '../services/notification_service.dart';
 import '../state/providers.dart';
 import 'agenda.dart';
+import 'contas_page.dart';
 import 'item_form_page.dart';
 import 'item_tile.dart';
+import 'resumo_contas.dart';
 import 'review_page.dart';
 import 'settings_page.dart';
 import 'theme/app_theme.dart';
@@ -45,8 +47,6 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
   void didChangeAppLifecycleState(AppLifecycleState estado) {
     if (estado == AppLifecycleState.resumed) {
       ref.read(itemsProvider.notifier).aoRetomar();
-      // Alarme tocando enquanto o app estava em segundo plano → volta para a tela cheia.
-      NotificationService.instance.verificarAlarmeTocando();
     }
   }
 
@@ -62,35 +62,6 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
     await ref.read(itemsProvider.notifier).aoRetomar();
     await notif.verificarLancamento();
     if (mounted) await _permissoesGuiadas();
-    if (mounted) await _sobreposicaoGuiada();
-  }
-
-  /// "Exibir sobre outros apps": é o que permite o alarme abrir em tela cheia por cima
-  /// de qualquer app, com o celular desbloqueado. Perguntamos uma vez, explicando o motivo.
-  Future<void> _sobreposicaoGuiada() async {
-    final nativo = AlarmeNativo.instance;
-    if (!nativo.disponivel || await nativo.temSobreposicao()) return;
-    final prefs = ref.read(prefsProvider);
-    if (prefs.getBool('sobreposicao_pedida') ?? false) return;
-    if (!mounted) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Alarme por cima de tudo'),
-        content: const Text(
-          'Para o alarme crítico abrir em tela cheia e tocar mesmo quando você está usando outro app '
-          'ou com o celular desbloqueado, o Android precisa da permissão “Exibir sobre outros apps”.\n\n'
-          'Na próxima tela, escolha o Lembra e ative a opção.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Depois')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Abrir ajustes')),
-        ],
-      ),
-    );
-    await prefs.setBool('sobreposicao_pedida', true);
-    if (ok == true) await nativo.pedirSobreposicao();
   }
 
   /// Na primeira abertura, explica por que as permissões são necessárias antes de pedir.
@@ -379,36 +350,42 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
     );
   }
 
-  /// Card "Contas a vencer". Hoje mostra a quantidade; quando o item ganhar o
-  /// campo de valor (R$), o total entra aqui.
+  /// Card "Contas a vencer": soma dos valores das contas em aberto (vencidas e
+  /// futuras). Tocar abre a lista de contas.
   Widget _cardContas(List<Item> itens, DateTime agora) {
-    final hoje0 = DateTime(agora.year, agora.month, agora.day);
-    final limite = agora.add(const Duration(days: 7));
+    final r = ResumoContas.de(itens, agora);
+    final qtd = r.quantidade;
+    final venc = r.vencidas.length;
+    final vencidas = venc == 1 ? '1 vencida' : '$venc vencidas';
 
-    final contas = itens.where((i) {
-      final a = i.ancora;
-      return i.tipo == TipoItem.conta && i.status == StatusItem.ativo && a != null && a.isBefore(limite);
-    }).toList();
-
-    bool vencida(DateTime a) => a.isBefore(agora) && (a.hour != 0 || a.minute != 0 || a.isBefore(hoje0));
-    final vencidas = contas.where((i) => vencida(i.ancora!)).length;
-
-    String caption;
-    if (contas.isEmpty) {
-      caption = 'Nenhuma nos próximos 7 dias';
-    } else if (vencidas > 0) {
-      caption = vencidas == 1 ? '1 vencida • próximos 7 dias' : '$vencidas vencidas • próximos 7 dias';
+    final String valor;
+    final String legenda;
+    if (qtd == 0) {
+      valor = formatarReais(0);
+      legenda = 'Nenhuma conta em aberto';
+    } else if (!r.temValor) {
+      valor = '$qtd';
+      legenda = [
+        qtd == 1 ? 'conta sem valor informado' : 'contas sem valor informado',
+        if (venc > 0) vencidas,
+      ].join(' • ');
     } else {
-      caption = 'nos próximos 7 dias';
+      valor = formatarReais(r.total);
+      legenda = [
+        qtd == 1 ? '1 conta' : '$qtd contas',
+        if (venc > 0) vencidas,
+        if (r.semValor > 0) '${r.semValor} sem valor',
+      ].join(' • ');
     }
 
     return StatCard(
       icon: Icons.account_balance_wallet_rounded,
       iconColor: AppColors.yellow,
       label: 'Contas a vencer',
-      value: '${contas.length}',
-      valueColor: vencidas > 0 ? const Color(0xFFDC2626) : AppColors.cyanDeep,
-      caption: caption,
+      value: valor,
+      valueColor: venc > 0 ? const Color(0xFFDC2626) : AppColors.cyanDeep,
+      caption: legenda,
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ContasPage())),
     );
   }
 
