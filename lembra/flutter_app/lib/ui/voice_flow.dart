@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import '../domain/draft.dart';
 import '../domain/item.dart';
 import '../nlp/comandos.dart';
 import '../state/providers.dart';

@@ -4,23 +4,31 @@
 // Uso no MaterialApp (lib/app.dart) — cobre todas as telas do app:
 //
 //   MaterialApp(
-//     builder: (context, child) =>
-//         PermissionGate(child: child ?? const SizedBox.shrink()),
+//     builder: (context, child) => PermissionGate(
+//       exigirSobreposicao: true, // opcional, veja abaixo
+//       child: child ?? const SizedBox.shrink(),
+//     ),
 //     ...
 //   )
+//
+// Android: para a sobreposição aparecer na lista do celular, declare no
+// AndroidManifest.xml:
+//   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
 
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-/// Bloqueia o app até as notificações (e, opcionalmente, os alarmes exatos)
-/// estarem permitidas. Reavalia sempre que o app volta das configurações.
+/// Bloqueia o app até as notificações (e, opcionalmente, os alarmes exatos e a
+/// sobreposição de tela) estarem permitidas. Reavalia sempre que o app volta
+/// das configurações.
 class PermissionGate extends StatefulWidget {
   const PermissionGate({
     super.key,
     required this.child,
     this.exigirAlarmesExatos = true,
+    this.exigirSobreposicao = false,
   });
 
   final Widget child;
@@ -28,6 +36,12 @@ class PermissionGate extends StatefulWidget {
   /// No Android 12+, o alarme exato é uma permissão especial, ativada em
   /// "Alarmes e lembretes". Sem ela, o lembrete pode não tocar na hora.
   final bool exigirAlarmesExatos;
+
+  /// "Aparecer sobre outros apps" (SYSTEM_ALERT_WINDOW). Ajuda o alarme crítico
+  /// a aparecer na tela mesmo com o celular desbloqueado e em uso.
+  /// Fica desligado por padrão: como o gate bloqueia o app inteiro, exigir isso
+  /// trava o usuário até ele ligar o botão nas configurações do sistema.
+  final bool exigirSobreposicao;
 
   @override
   State<PermissionGate> createState() => _PermissionGateState();
@@ -38,10 +52,12 @@ class _PermissionGateState extends State<PermissionGate>
   bool _verificando = true;
   PermissionStatus _notificacoes = PermissionStatus.denied;
   PermissionStatus _alarmes = PermissionStatus.granted;
+  bool _sobreposicao = true;
 
   bool get _tudoOk =>
       _notificacoes.isGranted &&
-      (!widget.exigirAlarmesExatos || _alarmes.isGranted);
+      (!widget.exigirAlarmesExatos || _alarmes.isGranted) &&
+      (!widget.exigirSobreposicao || _sobreposicao);
 
   @override
   void initState() {
@@ -63,6 +79,9 @@ class _PermissionGateState extends State<PermissionGate>
   }
 
   Future<void> _atualizar() async {
+    final sobrepoe = (Platform.isAndroid && widget.exigirSobreposicao)
+        ? await Permission.systemAlertWindow.isGranted
+        : true;
     final notif = await Permission.notification.status;
     final alarmes = (Platform.isAndroid && widget.exigirAlarmesExatos)
         ? await Permission.scheduleExactAlarm.status
@@ -71,6 +90,7 @@ class _PermissionGateState extends State<PermissionGate>
     setState(() {
       _notificacoes = notif;
       _alarmes = alarmes;
+      _sobreposicao = sobrepoe;
       _verificando = false;
     });
   }
@@ -92,6 +112,13 @@ class _PermissionGateState extends State<PermissionGate>
     await _atualizar();
   }
 
+  Future<void> _pedirSobreposicao() async {
+    // Abre a tela "Aparecer sobre outros apps" do sistema. O usuário liga o
+    // botão e volta; o didChangeAppLifecycleState reavalia ao retornar.
+    await Permission.systemAlertWindow.request();
+    await _atualizar();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_verificando) {
@@ -101,6 +128,21 @@ class _PermissionGateState extends State<PermissionGate>
 
     final tema = Theme.of(context);
     final notifPendente = !_notificacoes.isGranted;
+    final alarmesPendente = widget.exigirAlarmesExatos && !_alarmes.isGranted;
+
+    // Ordem dos passos: notificações -> alarmes exatos -> sobreposição.
+    final String mensagem;
+    if (notifPendente) {
+      mensagem = 'O Lembra existe para avisar você na hora certa. '
+          'Sem permitir as notificações, os lembretes e alarmes '
+          'não conseguem tocar.';
+    } else if (alarmesPendente) {
+      mensagem = 'Para despertar no horário exato, permita '
+          '"Alarmes e lembretes" para o Lembra.';
+    } else {
+      mensagem = 'Para o alarme aparecer na tela mesmo com o celular em uso, '
+          'permita "Aparecer sobre outros apps" para o Lembra.';
+    }
 
     return Scaffold(
       body: SafeArea(
@@ -123,12 +165,7 @@ class _PermissionGateState extends State<PermissionGate>
               ),
               const SizedBox(height: 12),
               Text(
-                notifPendente
-                    ? 'O Lembra existe para avisar você na hora certa. '
-                        'Sem permitir as notificações, os lembretes e alarmes '
-                        'não conseguem tocar.'
-                    : 'Para despertar no horário exato, permita '
-                        '"Alarmes e lembretes" para o Lembra.',
+                mensagem,
                 textAlign: TextAlign.center,
                 style: tema.textTheme.bodyLarge,
               ),
@@ -142,10 +179,15 @@ class _PermissionGateState extends State<PermissionGate>
                         : 'Permitir notificações',
                   ),
                 )
-              else
+              else if (alarmesPendente)
                 FilledButton(
                   onPressed: _pedirAlarmes,
                   child: const Text('Permitir alarmes e lembretes'),
+                )
+              else
+                FilledButton(
+                  onPressed: _pedirSobreposicao,
+                  child: const Text('Permitir aparecer sobre outros apps'),
                 ),
               if (notifPendente && _notificacoes.isPermanentlyDenied) ...[
                 const SizedBox(height: 12),

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import '../domain/item.dart';
 import '../state/providers.dart';
 import 'agenda.dart';
 import 'item_tile.dart';

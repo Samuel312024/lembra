@@ -137,7 +137,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
   List<Widget> _camposConta() => [
         const SizedBox(height: 16),
         DropdownButtonFormField<CategoriaConta>(
-          value: d.categoria,
+          initialValue: d.categoria,
           isExpanded: true,
           decoration: const InputDecoration(labelText: 'Tipo de conta', border: OutlineInputBorder()),
           hint: const Text('Selecione o tipo de conta'),
@@ -242,7 +242,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
               ),
             const SizedBox(height: 12),
             DropdownButtonFormField<_Rep>(
-              value: _rep,
+              initialValue: _rep,
               decoration: const InputDecoration(labelText: 'Repetir', border: OutlineInputBorder()),
               items: const [
                 DropdownMenuItem(value: _Rep.nenhuma, child: Text('Não repete')),

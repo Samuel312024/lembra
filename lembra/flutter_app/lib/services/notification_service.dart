@@ -1,17 +1,14 @@
 import 'dart:convert';
 import 'dart:typed_data';
-
-import 'package:flutter/material.dart' show MaterialPageRoute;
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
-import '../app.dart' show navigatorKey;
 import '../domain/item.dart';
-import '../ui/alarme_tocando_page.dart';
 import 'alarm_notification.dart';
 
 /// Agenda lembretes e alarmes locais (funcionam com o app fechado e sem internet).
@@ -30,13 +27,20 @@ class NotificationService {
   /// (acao, payload) — chamado quando o usuário toca na notificação ou em um botão.
   void Function(String? acao, String? payload)? aoResponder;
 
-  /// Evita abrir duas telas de alarme ao mesmo tempo.
-  bool _telaAlarmeAberta = false;
+  /// (idDoItem, idDaNotificação) — pede para mostrar o alarme crítico em tela
+  /// cheia. Quem define é o app.dart, que abre a AlarmPage.
+  void Function(String itemId, int? notificacaoId)? aoAbrirAlarme;
 
   static const _prefixoAlarme = 'alarme:';
+  static const _chaveSom = 'som_alarme';
+
+  /// Som do alarme crítico escolhido em Ajustes (padrão: alarme do celular).
+  SomAlarme _somAlarme = sonsAlarme.first;
+  SomAlarme get somAlarme => _somAlarme;
 
   static const _idBriefing = 2147483000;
   static const _idRevisao = 2147483001;
+  static const _idTesteSom = 2147483002;
 
   static const _acoes = [
     AndroidNotificationAction('feito', 'Feito', showsUserInterface: true, cancelNotification: true),
@@ -79,9 +83,10 @@ class NotificationService {
       description: 'Notificação com som',
       importance: Importance.high,
     ));
-    // O canal antigo não tinha o som do app; o novo (alarm_notification.dart) tem.
-    await a?.deleteNotificationChannel('lembretes_critico');
-    await criarCanalAlarme(_plugin);
+    // Canal do alarme crítico: um por som (ver alarm_notification.dart).
+    final prefs = await SharedPreferences.getInstance();
+    _somAlarme = somAlarmePorId(prefs.getString(_chaveSom));
+    await prepararCanalAlarme(_plugin, _somAlarme);
   }
 
   /// App aberto a partir de uma notificação (com o app fechado).
@@ -104,85 +109,55 @@ class NotificationService {
       return;
     }
     final acao = r.actionId;
-    if (acao == null || acao.isEmpty) {
-      _abrirTelaAlarme(alarme);
-    } else {
+    if (acao != null && acao.isNotEmpty) {
       // Botão da notificação: o handler do app espera o id do item como payload.
       aoResponder?.call(acao, alarme.itemId);
-    }
-  }
-
-  void _abrirTelaAlarme(_DadosAlarme a) {
-    if (_telaAlarmeAberta) return;
-    final nav = navigatorKey.currentState;
-    if (nav == null) {
-      aoResponder?.call(null, a.itemId);
       return;
     }
-    _telaAlarmeAberta = true;
-    nav
-        .push(MaterialPageRoute<void>(
-          fullscreenDialog: true,
-          builder: (_) => AlarmeTocandoPage(
-            titulo: a.titulo,
-            mensagem: a.corpo,
-            aoFeito: () => _encerrarAlarme(a, 'feito'),
-            aoAdiar: () => _encerrarAlarme(a, 'soneca'),
-            aoSilenciar: () => _encerrarAlarme(a, null),
-          ),
-        ))
-        .whenComplete(() => _telaAlarmeAberta = false);
-  }
-
-  /// Silencia o alarme (cancelar a notificação para o som insistente) e, se
-  /// houver, repassa a ação ("feito" / "soneca") ao handler do app.
-  Future<void> _encerrarAlarme(_DadosAlarme a, String? acao) async {
-    await _plugin.cancel(a.notifId);
-    if (a.repetir >= 0) {
-      // Alarme recorrente: o cancelamento também apagou os próximos disparos.
-      await _agendar(
-        a.notifId,
-        a.titulo,
-        a.corpo,
-        DateTime.fromMillisecondsSinceEpoch(a.quando),
-        _detalhes(Urgencia.critico),
-        a.itemId,
-        repetir: DateTimeComponents.values[a.repetir],
-        alarme: true,
-      );
+    final abrir = aoAbrirAlarme;
+    if (abrir != null) {
+      abrir(alarme.itemId, alarme.notifId);
+    } else {
+      aoResponder?.call(null, alarme.itemId); // sem tela de alarme: abre o item
     }
-    if (acao != null) aoResponder?.call(acao, a.itemId);
   }
 
-  String _codificarAlarme(
-    int notifId,
-    String titulo,
-    String corpo,
-    DateTime quando,
-    DateTimeComponents? repetir,
-    String itemId,
-  ) =>
-      '$_prefixoAlarme${jsonEncode({
-        'n': notifId,
-        'i': itemId,
-        't': titulo,
-        'c': corpo,
-        'q': quando.millisecondsSinceEpoch,
-        'r': repetir?.index ?? -1,
-      })}';
+  /// Para o som do alarme (cancela a notificação insistente). Alarmes
+  /// recorrentes são reagendados em seguida, para não perder os próximos.
+  Future<void> pararAlarme({int? notificacaoId, Item? item}) async {
+    if (notificacaoId != null) {
+      await _plugin.cancel(notificacaoId);
+    } else if (item != null) {
+      await cancelarItem(item.id);
+    }
+    if (item != null && item.regra != null) await agendarItem(item);
+  }
+
+  /// Troca o som do alarme crítico. Quem chama precisa reagendar os alarmes
+  /// (eles passam a usar o canal do novo som).
+  Future<void> definirSom(SomAlarme som) async {
+    _somAlarme = som;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_chaveSom, som.id);
+    await prepararCanalAlarme(_plugin, som);
+  }
+
+  /// Toca o som escolhido uma vez (notificação curta, some sozinha).
+  Future<void> testarSom() => _plugin.show(
+        _idTesteSom,
+        'Teste de som',
+        _somAlarme.rotulo,
+        NotificationDetails(android: detalhesAndroidAlarme(_somAlarme, insistente: false)),
+      );
+
+  String _codificarAlarme(int notifId, String itemId) =>
+      '$_prefixoAlarme${jsonEncode({'n': notifId, 'i': itemId})}';
 
   _DadosAlarme? _lerAlarme(String? payload) {
     if (payload == null || !payload.startsWith(_prefixoAlarme)) return null;
     try {
       final m = jsonDecode(payload.substring(_prefixoAlarme.length)) as Map<String, dynamic>;
-      return _DadosAlarme(
-        notifId: (m['n'] as num).toInt(),
-        itemId: m['i'] as String,
-        titulo: m['t'] as String,
-        corpo: m['c'] as String,
-        quando: (m['q'] as num).toInt(),
-        repetir: (m['r'] as num).toInt(),
-      );
+      return _DadosAlarme(notifId: (m['n'] as num).toInt(), itemId: m['i'] as String);
     } catch (_) {
       return null;
     }
@@ -333,9 +308,9 @@ class NotificationService {
     bool alarme = false,
   }) async {
     final data = tz.TZDateTime.from(quando, tz.local);
-    // Alarmes críticos levam título, mensagem e horário no payload para a tela
-    // cheia saber o que mostrar mesmo com o app fechado.
-    final carga = alarme ? _codificarAlarme(id, titulo, corpo, quando, repetir, payload) : payload;
+    // Alarmes críticos levam o id da notificação no payload; a tela cheia busca
+    // o resto (título, mensagem) no item.
+    final carga = alarme ? _codificarAlarme(id, payload) : payload;
     try {
       await _plugin.zonedSchedule(
         id,
@@ -390,23 +365,7 @@ class NotificationService {
         );
       case Urgencia.critico:
         return NotificationDetails(
-          android: AndroidNotificationDetails(
-            kCanalAlarmeId,
-            kCanalAlarmeNome,
-            channelDescription: kCanalAlarmeDescricao,
-            importance: Importance.max,
-            priority: Priority.max,
-            fullScreenIntent: true,
-            playSound: true,
-            sound: const RawResourceAndroidNotificationSound(kSomAlarme),
-            category: AndroidNotificationCategory.alarm,
-            audioAttributesUsage: AudioAttributesUsage.alarm,
-            visibility: NotificationVisibility.public,
-            ongoing: true,
-            autoCancel: false,
-            additionalFlags: Int32List.fromList(<int>[4]), // FLAG_INSISTENT: repete o som até confirmar
-            actions: _acoes,
-          ),
+          android: detalhesAndroidAlarme(_somAlarme, acoes: _acoes),
           iOS: const DarwinNotificationDetails(
             presentSound: true,
             interruptionLevel: InterruptionLevel.timeSensitive,
@@ -431,19 +390,8 @@ class NotificationService {
 
 /// O que um alarme crítico carrega no payload da notificação.
 class _DadosAlarme {
-  const _DadosAlarme({
-    required this.notifId,
-    required this.itemId,
-    required this.titulo,
-    required this.corpo,
-    required this.quando,
-    required this.repetir,
-  });
+  const _DadosAlarme({required this.notifId, required this.itemId});
 
   final int notifId;
   final String itemId;
-  final String titulo;
-  final String corpo;
-  final int quando; // milissegundos desde 1970
-  final int repetir; // índice de DateTimeComponents, ou -1 se não repete
 }

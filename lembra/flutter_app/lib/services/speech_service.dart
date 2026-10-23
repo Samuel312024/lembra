@@ -42,10 +42,10 @@ class SpeechService {
           aoParcial(_ultimo);
         }
       },
+      listenOptions: SpeechListenOptions(
       localeId: 'pt_BR',
       listenFor: const Duration(seconds: 30),
       pauseFor: const Duration(seconds: 3),
-      listenOptions: SpeechListenOptions(
         partialResults: true,
         cancelOnError: true,
         listenMode: ListenMode.dictation,

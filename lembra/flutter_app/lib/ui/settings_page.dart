@@ -1,10 +1,13 @@
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/notification_service.dart';
 import '../state/providers.dart';
+import '../state/som_provider.dart';
 import 'account_page.dart';
 import 'agenda.dart';
+import 'som_alarme_page.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -21,6 +24,8 @@ class SettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cfg = ref.watch(configProvider);
     final email = ref.watch(sessaoProvider);
+    final som = ref.watch(somAlarmeProvider);
+    final android = defaultTargetPlatform == TargetPlatform.android;
     final notifier = ref.read(configProvider.notifier);
 
     return Scaffold(
@@ -85,6 +90,13 @@ class SettingsPage extends ConsumerWidget {
               },
             ),
           const Divider(),
+          if (android)
+            ListTile(
+              leading: const Icon(Icons.music_note_outlined),
+              title: const Text('Som do alarme'),
+              subtitle: Text(som.rotulo),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SomAlarmePage())),
+            ),
           ListTile(
             leading: const Icon(Icons.notifications_active_outlined),
             title: const Text('Permissões de alarme'),
@@ -154,6 +166,7 @@ class SettingsPage extends ConsumerWidget {
       ),
     );
     if (ok != true) return;
+    if (!context.mounted) return; // 👈 adiciona essa linha
     final messenger = ScaffoldMessenger.of(context);
     if (ref.read(sessaoProvider) != null) {
       try {
