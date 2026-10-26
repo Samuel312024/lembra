@@ -9,6 +9,7 @@ import '../domain/item.dart';
 import '../services/notification_service.dart';
 import '../state/providers.dart';
 import 'agenda.dart';
+import 'conta_paga.dart';
 import 'contas_page.dart';
 import 'item_form_page.dart';
 import 'item_tile.dart';
@@ -101,13 +102,9 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
   }
 
   Future<void> _concluir(Item item) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final notifier = ref.read(itemsProvider.notifier);
-    final antes = await notifier.concluir(item.id);
-    messenger.showSnackBar(SnackBar(
-      content: Text('“${item.titulo}” concluído.'),
-      action: antes == null ? null : SnackBarAction(label: 'Desfazer', onPressed: () => notifier.restaurar(antes)),
-    ));
+    final antes = await ref.read(itemsProvider.notifier).concluir(item.id);
+    if (!mounted) return;
+    avisarConcluido(context, ref, item, antes);
   }
 
   Future<void> _cancelar(Item item) async {

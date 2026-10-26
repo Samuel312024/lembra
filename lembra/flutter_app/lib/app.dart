@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'services/notification_service.dart';
 import 'ui/alarm_page.dart';
-import 'ui/permission_gate.dart';
+import 'ui/boas_vindas_page.dart';
 import 'ui/theme/app_theme.dart';
 import 'ui/today_preview.dart';
 import 'ui/home_page.dart';
@@ -71,14 +71,7 @@ class _LembraAppState extends State<LembraApp> {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      // Cobre todas as telas: bloqueia o app até as permissões serem liberadas.
-      // exigirSobreposicao: true é só pra testar; depois remova essa linha
-      // (padrão false) pra não prender o usuário na tela de permissão.
-      builder: (context, child) => PermissionGate(
-        // exigirSobreposicao: true,
-        child: child ?? const SizedBox.shrink(),
-      ),
-      home: _verPreview ? const TodayPreviewPage() : const HomePage(),
+      home: _verPreview ? const TodayPreviewPage() : const PrimeiroUso(child: HomePage()),
     );
   }
 }

@@ -11,9 +11,11 @@ import '../domain/dinheiro.dart';
 import '../domain/draft.dart';
 import '../domain/item.dart';
 import '../state/providers.dart';
+import 'conta_paga.dart';
 import 'item_form_page.dart';
 import 'item_tile.dart';
 import 'resumo_contas.dart';
+import 'resumo_mes_page.dart';
 import 'theme/app_theme.dart';
 import 'widgets/ui_kit.dart';
 
@@ -49,13 +51,9 @@ class _ContasPageState extends ConsumerState<ContasPage> {
   }
 
   Future<void> _concluir(Item item) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final notifier = ref.read(itemsProvider.notifier);
-    final antes = await notifier.concluir(item.id);
-    messenger.showSnackBar(SnackBar(
-      content: Text('“${item.titulo}” paga.'),
-      action: antes == null ? null : SnackBarAction(label: 'Desfazer', onPressed: () => notifier.restaurar(antes)),
-    ));
+    final antes = await ref.read(itemsProvider.notifier).concluir(item.id);
+    if (!mounted) return;
+    avisarConcluido(context, ref, item, antes);
   }
 
   Future<void> _cancelar(Item item) async {
@@ -279,7 +277,16 @@ class _ContasPageState extends ConsumerState<ContasPage> {
   Widget build(BuildContext context) {
     final itens = ref.watch(itemsProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Contas a pagar')),
+      appBar: AppBar(
+        title: const Text('Contas a pagar'),
+        actions: [
+          IconButton(
+            tooltip: 'Resumo do mês',
+            icon: const Icon(Icons.bar_chart_rounded),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ResumoMesPage())),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _nova,
         icon: const Icon(Icons.add),

@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:typed_data';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
+import '../domain/dinheiro.dart';
 import '../domain/item.dart';
 import 'alarm_notification.dart';
 
@@ -374,7 +375,13 @@ class NotificationService {
     }
   }
 
-  String _titulo(Item item, int off) => off == 0 ? item.titulo : '${_antes(off)}: ${item.titulo}';
+  /// Conta com valor mostra o valor no aviso: "Conta de luz • R$ 150,00".
+  String _titulo(Item item, int off) {
+    final nome = (item.tipo == TipoItem.conta && item.valor != null)
+        ? '${item.titulo} • ${formatarReais(item.valor!)}'
+        : item.titulo;
+    return off == 0 ? nome : '${_antes(off)}: $nome';
+  }
 
   String _antes(int off) {
     if (off >= 1440 && off % 1440 == 0) return 'Em ${off ~/ 1440} dia${off ~/ 1440 > 1 ? 's' : ''}';

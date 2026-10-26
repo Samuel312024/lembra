@@ -1,6 +1,6 @@
 // Substitui o seu MainActivity.kt (se o seu tiver código extra, mescle).
 // Ajuste a linha "package" para a mesma do seu arquivo original.
-package com.example.lembra
+package com.samsolution.mylembra
 
 import android.app.AlarmManager
 import android.content.Context

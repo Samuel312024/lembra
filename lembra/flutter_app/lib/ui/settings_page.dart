@@ -7,6 +7,7 @@ import '../state/providers.dart';
 import '../state/som_provider.dart';
 import 'account_page.dart';
 import 'agenda.dart';
+import 'dados_page.dart';
 import 'som_alarme_page.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -113,6 +114,12 @@ class SettingsPage extends ConsumerWidget {
             ),
           ),
           const Divider(),
+          ListTile(
+            leading: const Icon(Icons.shield_outlined),
+            title: const Text('Dados e diagnóstico'),
+            subtitle: const Text('Backup dos lembretes e relatório de problemas'),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DadosPage())),
+          ),
           ListTile(
             leading: Icon(Icons.delete_forever_outlined, color: Theme.of(context).colorScheme.error),
             title: const Text('Excluir todos os meus dados'),

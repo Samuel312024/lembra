@@ -1,6 +1,6 @@
 // Copie este arquivo para a MESMA pasta do MainActivity.kt
 // (android/app/src/main/kotlin/<seu/pacote>/) e ajuste a linha "package" abaixo.
-package com.example.lembra
+package com.samsolution.mylembra
 
 import android.app.AlarmManager
 import android.app.Notification
