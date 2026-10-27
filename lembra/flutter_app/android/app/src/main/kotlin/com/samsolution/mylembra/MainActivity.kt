@@ -1,5 +1,3 @@
-// Substitui o seu MainActivity.kt (se o seu tiver código extra, mescle).
-// Ajuste a linha "package" para a mesma do seu arquivo original.
 package com.samsolution.mylembra
 
 import android.app.AlarmManager
@@ -62,6 +60,32 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         val ctx = applicationContext
+
+        // Som do alarme tocado como ALARME (funciona no modo vibrar). Usado na prévia.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "lembra/alarme_som")
+            .setMethodCallHandler { call, result ->
+                try {
+                    when (call.method) {
+                        "tocar" -> {
+                            AlarmeSom.tocar(
+                                ctx,
+                                call.argument<String>("recurso"),
+                                call.argument<String>("uri"),
+                                call.argument<Boolean>("repetir") ?: false,
+                            )
+                            result.success(null)
+                        }
+                        "parar" -> {
+                            AlarmeSom.parar()
+                            result.success(null)
+                        }
+                        else -> result.notImplemented()
+                    }
+                } catch (e: Exception) {
+                    result.error("alarme_som", e.message, null)
+                }
+            }
+
         val c = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "lembra/alarme")
         canal = c
         c.setMethodCallHandler { call, result ->
@@ -93,6 +117,7 @@ class MainActivity : FlutterActivity() {
                     }
                     "parar" -> {
                         AlarmeService.parar(ctx)
+                        AlarmeSom.parar()
                         soltarJanela()
                         result.success(true)
                     }

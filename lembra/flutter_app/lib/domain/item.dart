@@ -171,4 +171,6 @@ class Item {
       dirty: (m['dirty'] as num?)?.toInt() == 1,
     );
   }
+
+  String? get somAlarmeId => null;
 }

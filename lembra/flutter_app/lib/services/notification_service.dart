@@ -11,6 +11,7 @@ import 'package:timezone/timezone.dart' as tz;
 import '../domain/dinheiro.dart';
 import '../domain/item.dart';
 import 'alarm_notification.dart';
+import 'alarme_som_nativo.dart';
 
 /// Agenda lembretes e alarmes locais (funcionam com o app fechado e sem internet).
 ///
@@ -39,9 +40,12 @@ class NotificationService {
   SomAlarme _somAlarme = sonsAlarme.first;
   SomAlarme get somAlarme => _somAlarme;
 
+  /// Som do lembrete; sem escolha própria, usa o padrão de Ajustes.
+  SomAlarme _somDe(Item item) =>
+      item.somAlarmeId == null ? _somAlarme : somAlarmePorId(item.somAlarmeId);
+
   static const _idBriefing = 2147483000;
   static const _idRevisao = 2147483001;
-  static const _idTesteSom = 2147483002;
 
   static const _acoes = [
     AndroidNotificationAction('feito', 'Feito', showsUserInterface: true, cancelNotification: true),
@@ -84,7 +88,7 @@ class NotificationService {
       description: 'Notificação com som',
       importance: Importance.high,
     ));
-    // Canal do alarme crítico: um por som (ver alarm_notification.dart).
+    // Canais do alarme crítico: um por som, todos ativos (ver alarm_notification.dart).
     final prefs = await SharedPreferences.getInstance();
     _somAlarme = somAlarmePorId(prefs.getString(_chaveSom));
     await prepararCanalAlarme(_plugin, _somAlarme);
@@ -134,8 +138,8 @@ class NotificationService {
     if (item != null && item.regra != null) await agendarItem(item);
   }
 
-  /// Troca o som do alarme crítico. Quem chama precisa reagendar os alarmes
-  /// (eles passam a usar o canal do novo som).
+  /// Troca o som padrão do alarme crítico. Quem chama precisa reagendar os
+  /// alarmes (os lembretes sem som próprio passam a usar o novo).
   Future<void> definirSom(SomAlarme som) async {
     _somAlarme = som;
     final prefs = await SharedPreferences.getInstance();
@@ -143,13 +147,8 @@ class NotificationService {
     await prepararCanalAlarme(_plugin, som);
   }
 
-  /// Toca o som escolhido uma vez (notificação curta, some sozinha).
-  Future<void> testarSom() => _plugin.show(
-        _idTesteSom,
-        'Teste de som',
-        _somAlarme.rotulo,
-        NotificationDetails(android: detalhesAndroidAlarme(_somAlarme, insistente: false)),
-      );
+  /// Toca o som escolhido uma vez, como alarme (funciona no modo vibrar).
+  Future<void> testarSom() => AlarmeSomNativo.tocar(_somAlarme);
 
   String _codificarAlarme(int notifId, String itemId) =>
       '$_prefixoAlarme${jsonEncode({'n': notifId, 'i': itemId})}';
@@ -219,7 +218,7 @@ class NotificationService {
 
     final agora = DateTime.now();
     final base = _base(item.id);
-    final detalhes = _detalhes(item.urgencia);
+    final detalhes = _detalhes(item.urgencia, som: _somDe(item));
     final critico = item.urgencia == Urgencia.critico;
     final offsets = item.antecedencias.toSet().toList()..sort((a, b) => b.compareTo(a));
     final rec = item.regra;
@@ -273,7 +272,8 @@ class NotificationService {
   /// Aviso único daqui a [duracao] (soneca).
   Future<void> agendarSoneca(Item item, Duration duracao) async {
     final quando = DateTime.now().add(duracao);
-    await _agendar(_base(item.id) + 7, item.titulo, 'Adiado', quando, _detalhes(item.urgencia), item.id,
+    await _agendar(_base(item.id) + 7, item.titulo, 'Adiado', quando,
+        _detalhes(item.urgencia, som: _somDe(item)), item.id,
         alarme: item.urgencia == Urgencia.critico);
   }
 
@@ -338,7 +338,7 @@ class NotificationService {
     }
   }
 
-  NotificationDetails _detalhes(Urgencia u) {
+  NotificationDetails _detalhes(Urgencia u, {SomAlarme? som}) {
     switch (u) {
       case Urgencia.discreto:
         return const NotificationDetails(
@@ -366,7 +366,7 @@ class NotificationService {
         );
       case Urgencia.critico:
         return NotificationDetails(
-          android: detalhesAndroidAlarme(_somAlarme, acoes: _acoes),
+          android: detalhesAndroidAlarme(som ?? _somAlarme, acoes: _acoes),
           iOS: const DarwinNotificationDetails(
             presentSound: true,
             interruptionLevel: InterruptionLevel.timeSensitive,

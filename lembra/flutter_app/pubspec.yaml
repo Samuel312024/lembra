@@ -28,6 +28,10 @@ dependencies:
   flutter_animate: ^4.5.2
   flutter_slidable: ^4.0.3
   permission_handler: ^12.0.3
+  pdf: ^3.12.0
+  printing: ^5.14.3
+  share_plus: ^12.0.2
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:

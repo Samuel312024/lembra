@@ -119,26 +119,25 @@ AndroidNotificationChannel canalAlarme(SomAlarme s) => AndroidNotificationChanne
       enableVibration: true,
     );
 
-/// Cria o canal do som escolhido e apaga todos os outros canais de alarme:
-/// os de outros sons e os de versões antigas do app (qualquer sufixo).
-Future<void> prepararCanalAlarme(FlutterLocalNotificationsPlugin plugin, SomAlarme escolhido) async {
+/// Cria o canal de TODOS os sons (cada lembrete pode usar um diferente) e
+/// apaga canais de versões antigas ou de sons que não existem mais.
+Future<void> prepararCanalAlarme(FlutterLocalNotificationsPlugin plugin, [SomAlarme? _]) async {
   final android = plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
   if (android == null) return;
 
-  final atual = canalAlarmeId(escolhido);
-
-  // Canal da primeira versão do app.
   await android.deleteNotificationChannel('lembretes_critico');
 
-  // Qualquer canal de alarme que não seja o atual (outros sons, v2, v3...).
+  final validos = sonsAlarme.map(canalAlarmeId).toSet();
   final existentes = await android.getNotificationChannels() ?? const <AndroidNotificationChannel>[];
   for (final c in existentes) {
-    if (c.id.startsWith(kCanalAlarmePrefixo) && c.id != atual) {
+    if (c.id.startsWith(kCanalAlarmePrefixo) && !validos.contains(c.id)) {
       await android.deleteNotificationChannel(c.id);
     }
   }
 
-  await android.createNotificationChannel(canalAlarme(escolhido));
+  for (final s in sonsAlarme) {
+    await android.createNotificationChannel(canalAlarme(s));
+  }
 }
 
 /// Detalhes (Android) da notificação do alarme crítico.
