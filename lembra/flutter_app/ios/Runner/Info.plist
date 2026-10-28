@@ -43,6 +43,12 @@
 					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
 					<key>UISceneStoryboardFile</key>
 					<string>Main</string>
+					<key>NSMicrophoneUsageDescription</key>
+					<string>O Lembra usa o microfone para você criar lembretes por voz.</string>
+					<key>NSSpeechRecognitionUsageDescription</key>
+					<string>O Lembra reconhece sua fala para transformar em lembretes.</string>
+					<key>ITSAppUsesNonExemptEncryption</key>
+					<false/>
 				</dict>
 			</array>
 		</dict>

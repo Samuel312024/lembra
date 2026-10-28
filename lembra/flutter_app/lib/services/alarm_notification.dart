@@ -16,7 +16,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-const String kCanalAlarmePrefixo = 'lembra_alarme_';
+const String kCanalAlarmePrefixo = 'lembra_alarme_v2';
 // v4: canais criados antes do audioAttributesUsage.alarm ficavam presos ao
 // áudio de notificação (que o modo vibrar silencia). Novo id = canal novo.
 const String kCanalAlarmeVersao = 'v4';
@@ -121,6 +121,7 @@ AndroidNotificationChannel canalAlarme(SomAlarme s) => AndroidNotificationChanne
 
 /// Cria o canal de TODOS os sons (cada lembrete pode usar um diferente) e
 /// apaga canais de versões antigas ou de sons que não existem mais.
+/// Chame uma vez na inicialização do app, antes de qualquer alarme.
 Future<void> prepararCanalAlarme(FlutterLocalNotificationsPlugin plugin, [SomAlarme? _]) async {
   final android = plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
   if (android == null) return;
@@ -165,5 +166,34 @@ AndroidNotificationDetails detalhesAndroidAlarme(
     // 4 = FLAG_INSISTENT: repete o som até o usuário mexer na notificação.
     additionalFlags: insistente ? Int32List.fromList(<int>[4]) : null,
     actions: insistente ? acoes : null,
+  );
+}
+
+/// Dispara o alarme agora, com o som escolhido pelo usuário.
+/// Pressupõe que prepararCanalAlarme() já rodou na inicialização do app.
+///
+/// [somId] é o id gravado nos Ajustes (ex.: 'celular', 'sirene'); nulo ou
+/// desconhecido cai no alarme do celular.
+/// [insistente] = false toca a versão curta (8 s, sem tela cheia), ideal para
+/// o botão "Testar som".
+Future<void> despertar(
+  FlutterLocalNotificationsPlugin plugin, {
+  required int id,
+  required String titulo,
+  String? corpo,
+  String? somId,
+  String? payload,
+  List<AndroidNotificationAction>? acoes,
+  bool insistente = true,
+}) async {
+  final som = somAlarmePorId(somId);
+  await plugin.show(
+    id,
+    titulo,
+    corpo,
+    NotificationDetails(
+      android: detalhesAndroidAlarme(som, acoes: acoes, insistente: insistente),
+    ),
+    payload: payload,
   );
 }

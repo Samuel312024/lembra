@@ -16,8 +16,9 @@ import 'alarme_som_nativo.dart';
 /// Agenda lembretes e alarmes locais (funcionam com o app fechado e sem internet).
 ///
 /// Garantias por plataforma:
-///  - Android: alarme exato + tela cheia no nível "crítico" (exige permissões
-///    de alarme exato e de tela cheia, pedidas de forma guiada nos Ajustes).
+///  - Android: alarme exato + tela cheia em todas as urgências (discreto, normal
+///    e crítico), acendendo a tela mesmo apagada (exige permissões de alarme
+///    exato e de tela cheia, pedidas de forma guiada nos Ajustes).
 ///  - iOS: não existe alarme em segundo plano para apps comuns; usamos
 ///    notificações locais com som e prioridade "time-sensitive".
 class NotificationService {
@@ -29,8 +30,8 @@ class NotificationService {
   /// (acao, payload) — chamado quando o usuário toca na notificação ou em um botão.
   void Function(String? acao, String? payload)? aoResponder;
 
-  /// (idDoItem, idDaNotificação) — pede para mostrar o alarme crítico em tela
-  /// cheia. Quem define é o app.dart, que abre a AlarmPage.
+  /// (idDoItem, idDaNotificação) — pede para mostrar o alarme em tela cheia.
+  /// Quem define é o app.dart, que abre a AlarmPage.
   void Function(String itemId, int? notificacaoId)? aoAbrirAlarme;
 
   static const _prefixoAlarme = 'alarme:';
@@ -74,18 +75,21 @@ class NotificationService {
     );
 
     final a = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    // Canais v2: o Android não deixa mudar a importância de um canal já criado.
+    await a?.deleteNotificationChannel('lembretes_discreto');
+    await a?.deleteNotificationChannel('lembretes_normal');
     await a?.createNotificationChannel(const AndroidNotificationChannel(
-      'lembretes_discreto',
+      'lembretes_discreto_v2',
       'Lembretes discretos',
-      description: 'Notificação silenciosa',
-      importance: Importance.low,
+      description: 'Acende a tela, sem som e sem vibração',
+      importance: Importance.high,
       playSound: false,
       enableVibration: false,
     ));
     await a?.createNotificationChannel(const AndroidNotificationChannel(
-      'lembretes_normal',
+      'lembretes_normal_v2',
       'Lembretes',
-      description: 'Notificação com som',
+      description: 'Acende a tela, com som',
       importance: Importance.high,
     ));
     // Canais do alarme crítico: um por som, todos ativos (ver alarm_notification.dart).
@@ -168,6 +172,8 @@ class NotificationService {
   Future<bool> pedirPermissoes() async {
     final a = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     final i = _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+    final android = FlutterLocalNotificationsPlugin().resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    await android?.requestFullScreenIntentPermission();
     var ok = true;
     if (a != null) {
       ok = (await a.requestNotificationsPermission()) ?? false;
@@ -219,7 +225,7 @@ class NotificationService {
     final agora = DateTime.now();
     final base = _base(item.id);
     final detalhes = _detalhes(item.urgencia, som: _somDe(item));
-    final critico = item.urgencia == Urgencia.critico;
+    const critico = true; // toda urgência abre a tela de alarme
     final offsets = item.antecedencias.toSet().toList()..sort((a, b) => b.compareTo(a));
     final rec = item.regra;
 
@@ -274,7 +280,7 @@ class NotificationService {
     final quando = DateTime.now().add(duracao);
     await _agendar(_base(item.id) + 7, item.titulo, 'Adiado', quando,
         _detalhes(item.urgencia, som: _somDe(item)), item.id,
-        alarme: item.urgencia == Urgencia.critico);
+        alarme: true);
   }
 
   /// Briefing da manhã e revisão da noite: notificações diárias fixas.
@@ -294,7 +300,7 @@ class NotificationService {
     final agora = DateTime.now();
     var quando = DateTime(agora.year, agora.month, agora.day, minutos ~/ 60, minutos % 60);
     if (!quando.isAfter(agora)) quando = DateTime(quando.year, quando.month, quando.day + 1, minutos ~/ 60, minutos % 60);
-    await _agendar(id, titulo, corpo, quando, _detalhes(Urgencia.normal), payload,
+    await _agendar(id, titulo, corpo, quando, _detalhes(Urgencia.normal, telaCheia: false), payload,
         repetir: DateTimeComponents.time);
   }
 
@@ -309,7 +315,7 @@ class NotificationService {
     bool alarme = false,
   }) async {
     final data = tz.TZDateTime.from(quando, tz.local);
-    // Alarmes críticos levam o id da notificação no payload; a tela cheia busca
+    // Alarmes levam o id da notificação no payload; a tela cheia busca
     // o resto (título, mensagem) no item.
     final carga = alarme ? _codificarAlarme(id, payload) : payload;
     try {
@@ -338,31 +344,37 @@ class NotificationService {
     }
   }
 
-  NotificationDetails _detalhes(Urgencia u, {SomAlarme? som}) {
+  NotificationDetails _detalhes(Urgencia u, {SomAlarme? som, bool telaCheia = true}) {
     switch (u) {
       case Urgencia.discreto:
         return const NotificationDetails(
           android: AndroidNotificationDetails(
-            'lembretes_discreto',
+            'lembretes_discreto_v2',
             'Lembretes discretos',
-            importance: Importance.low,
-            priority: Priority.low,
+            importance: Importance.high,
+            priority: Priority.high,
             playSound: false,
             enableVibration: false,
+            category: AndroidNotificationCategory.alarm,
+            fullScreenIntent: true,
+            visibility: NotificationVisibility.public,
             actions: _acoes,
           ),
           iOS: DarwinNotificationDetails(presentSound: false, interruptionLevel: InterruptionLevel.passive),
         );
       case Urgencia.normal:
-        return const NotificationDetails(
+        return NotificationDetails(
           android: AndroidNotificationDetails(
-            'lembretes_normal',
+            'lembretes_normal_v2',
             'Lembretes',
             importance: Importance.high,
             priority: Priority.high,
+            category: telaCheia ? AndroidNotificationCategory.alarm : null,
+            fullScreenIntent: telaCheia,
+            visibility: NotificationVisibility.public,
             actions: _acoes,
           ),
-          iOS: DarwinNotificationDetails(presentSound: true, interruptionLevel: InterruptionLevel.active),
+          iOS: const DarwinNotificationDetails(presentSound: true, interruptionLevel: InterruptionLevel.active),
         );
       case Urgencia.critico:
         return NotificationDetails(
@@ -395,7 +407,7 @@ class NotificationService {
   }
 }
 
-/// O que um alarme crítico carrega no payload da notificação.
+/// O que um alarme carrega no payload da notificação.
 class _DadosAlarme {
   const _DadosAlarme({required this.notifId, required this.itemId});
 

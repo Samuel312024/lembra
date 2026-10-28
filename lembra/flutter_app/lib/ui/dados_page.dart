@@ -12,6 +12,7 @@ import '../domain/item.dart';
 import '../services/backup_pdf.dart';
 import '../services/diagnostico.dart';
 import '../state/providers.dart';
+import '../services/calendario_ics.dart';
 
 class DadosPage extends ConsumerStatefulWidget {
   const DadosPage({super.key});
@@ -145,6 +146,16 @@ class _DadosPageState extends ConsumerState<DadosPage> {
     );
   }
 
+    Future<void> _exportarCalendario() async {
+    try {
+      final itens = await ref.read(repoProvider).listar();
+      final n = await CalendarioIcs.compartilhar(itens);
+      if (n == 0 && mounted) _aviso('Nenhum lembrete ativo com data para exportar.');
+    } catch (_) {
+      if (mounted) _aviso('Não consegui exportar para o calendário.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final qtd = Diagnostico.erros().length;
@@ -182,6 +193,12 @@ class _DadosPageState extends ConsumerState<DadosPage> {
             title: const Text('Relatório de problemas'),
             subtitle: Text(qtd == 0 ? 'Nenhum problema registrado' : '$qtd registrado(s) neste aparelho'),
             onTap: _verRelatorio,
+          ),
+          ListTile(
+            leading: const Icon(Icons.event_available_outlined),
+            title: const Text('Exportar para o calendário'),
+            subtitle: const Text('Google Agenda, Samsung, Outlook e outros (.ics)'),
+            onTap: _exportarCalendario,
           ),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 4, 16, 16),

@@ -19,6 +19,7 @@ import 'settings_page.dart';
 import 'theme/app_theme.dart';
 import 'voice_flow.dart';
 import 'widgets/ui_kit.dart';
+import '../services/compartilhar_app.dart';
 
 /// Tela "Hoje" (home) com a aba "Próximos" e filtro por tipo.
 class HomePage extends ConsumerStatefulWidget {
@@ -82,6 +83,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Depois')),
           FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Permitir')),
+          // IconButton(tooltip: 'Compartilhar o Lembra', icon: const Icon(Icons.share_outlined),onPressed: CompartilharApp.compartilhar,),
         ],
       ),
     );
@@ -537,19 +539,26 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
                       ],
                     ),
                     const SizedBox(height: 8),
-                    const TabBar(
-                      isScrollable: true,
-                      tabAlignment: TabAlignment.start,
-                      padding: EdgeInsets.zero,
-                      labelPadding: EdgeInsets.only(right: 24),
-                      dividerColor: Colors.transparent,
-                      indicatorColor: AppColors.brandSoft,
-                      indicatorWeight: 3,
-                      indicatorSize: TabBarIndicatorSize.label,
-                      labelColor: AppColors.onDark,
-                      unselectedLabelColor: AppColors.onDarkMuted,
-                      labelStyle: TextStyle(fontWeight: FontWeight.w700),
-                      tabs: [Tab(text: 'Hoje'), Tab(text: 'Próximos')],
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: TabBar(
+                            isScrollable: true,
+                            tabAlignment: TabAlignment.start,
+                            padding: EdgeInsets.zero,
+                            labelPadding: EdgeInsets.only(right: 24),
+                            dividerColor: Colors.transparent,
+                            indicatorColor: AppColors.brandSoft,
+                            indicatorWeight: 3,
+                            indicatorSize: TabBarIndicatorSize.label,
+                            labelColor: AppColors.onDark,
+                            unselectedLabelColor: AppColors.onDarkMuted,
+                            labelStyle: TextStyle(fontWeight: FontWeight.w700),
+                            tabs: [Tab(text: 'Hoje'), Tab(text: 'Próximos')],
+                          ),
+                        ),
+                        _acao(Icons.share_outlined, 'Compartilhar o Lembra', CompartilharApp.compartilhar),
+                      ],
                     ),
                   ],
                 ),
