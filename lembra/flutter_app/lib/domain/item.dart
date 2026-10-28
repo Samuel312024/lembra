@@ -60,6 +60,7 @@ class Item {
     required this.criadoEm,
     required this.atualizadoEm,
     this.dirty = true,
+    this.somAlarmeId,
   }) : antecedencias = antecedencias ?? [];
 
   String id;
@@ -80,6 +81,10 @@ class Item {
   DateTime criadoEm;
   DateTime atualizadoEm;
   bool dirty; // alterado localmente e ainda não sincronizado
+
+  /// Som próprio do alarme deste lembrete (id de um SomAlarme).
+  /// null = usa o som padrão escolhido em Ajustes > Som do alarme.
+  String? somAlarmeId;
 
   /// Tarefas e contas usam "prazo"; compromissos e hábitos usam "início".
   bool get usaPrazo => tipo == TipoItem.tarefa || tipo == TipoItem.conta;
@@ -117,13 +122,17 @@ class Item {
         criadoEm: criadoEm,
         atualizadoEm: atualizadoEm,
         dirty: dirty,
+        somAlarmeId: somAlarmeId,
       );
 
-  /// Mapa para o SQLite local.
+  /// Mapa para o SQLite local (e para o backup).
+  /// A coluna som_alarme_id só entra quando o lembrete tem som próprio, para
+  /// não quebrar bancos que ainda não ganharam essa coluna.
   Map<String, Object?> toMap() => {
         ...toJson(),
         'antecedencias': jsonEncode(antecedencias),
         'dirty': dirty ? 1 : 0,
+        if (somAlarmeId != null) 'som_alarme_id': somAlarmeId,
       };
 
   /// JSON da API de sincronização (datas em milissegundos UTC).
@@ -169,8 +178,7 @@ class Item {
       criadoEm: _dt(m['criado_em'])!,
       atualizadoEm: _dt(m['atualizado_em'])!,
       dirty: (m['dirty'] as num?)?.toInt() == 1,
+      somAlarmeId: m['som_alarme_id'] as String?,
     );
   }
-
-  String? get somAlarmeId => null;
 }

@@ -10,7 +10,11 @@ import 'package:share_plus/share_plus.dart';
 import '../domain/dinheiro.dart';
 import '../domain/item.dart';
 
-/// Backup profissional: PDF para ler/guardar + arquivo de texto para restaurar.
+/// Backup profissional: PDF para ler/guardar + arquivo .json para restaurar.
+///
+/// Os dois são compartilhados em chamadas SEPARADAS (um arquivo por vez).
+/// Mandar PDF + texto juntos faz o WhatsApp colar o texto na conversa e
+/// descartar o PDF.
 class BackupPdf {
   static const _marca = PdfColor.fromInt(0xFFB7550B);
   static const _fundo = PdfColor.fromInt(0xFFF7F1E8);
@@ -18,7 +22,15 @@ class BackupPdf {
   static const _texto = PdfColor.fromInt(0xFF2B2B2B);
   static const _suave = PdfColor.fromInt(0xFF7A746C);
 
-  static String _maiuscula(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+  // A fonte padrão do pacote pdf (Helvetica) cobre acentos do português,
+  // mas não símbolos como "•" e "—". Por isso o código usa só "-".
+  static const _vazio = '-';
+
+  static String _situacao(StatusItem s) => switch (s) {
+        StatusItem.ativo => 'Ativo',
+        StatusItem.concluido => 'Concluído',
+        StatusItem.cancelado => 'Cancelado',
+      };
 
   static String _repeticao(Item i) {
     switch (i.regra?.freq) {
@@ -35,10 +47,11 @@ class BackupPdf {
 
   static String _titulo(Item i) {
     final conta = i.tipo == TipoItem.conta && i.valor != null;
-    return conta ? '${i.titulo} • ${formatarReais(i.valor!)}' : i.titulo;
+    return conta ? '${i.titulo} - ${formatarReais(i.valor!)}' : i.titulo;
   }
 
-  static pw.Widget _celula(String t, {bool cab = false, PdfColor? cor}) => pw.Padding(
+  static pw.Widget _celula(String t, {bool cab = false, PdfColor? cor}) =>
+      pw.Padding(
         padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
         child: pw.Text(
           t,
@@ -54,12 +67,28 @@ class BackupPdf {
         child: pw.Container(
           margin: const pw.EdgeInsets.only(right: 8),
           padding: const pw.EdgeInsets.all(10),
-          decoration: pw.BoxDecoration(color: _fundo, borderRadius: pw.BorderRadius.circular(6)),
-          child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-            pw.Text(valor, style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: _marca)),
-            pw.SizedBox(height: 2),
-            pw.Text(rotulo, style: const pw.TextStyle(fontSize: 9, color: _suave)),
-          ]),
+          decoration: pw.BoxDecoration(
+            color: _fundo,
+            borderRadius: pw.BorderRadius.circular(6),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                valor,
+                style: pw.TextStyle(
+                  fontSize: 20,
+                  fontWeight: pw.FontWeight.bold,
+                  color: _marca,
+                ),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                rotulo,
+                style: const pw.TextStyle(fontSize: 9, color: _suave),
+              ),
+            ],
+          ),
         ),
       );
 
@@ -90,9 +119,9 @@ class BackupPdf {
         for (final i in itens)
           pw.TableRow(children: [
             _celula(_titulo(i)),
-            _celula(i.ancora == null ? '—' : fmt.format(i.ancora!)),
+            _celula(i.ancora == null ? _vazio : fmt.format(i.ancora!)),
             _celula(_repeticao(i), cor: _suave),
-            _celula(_maiuscula(i.status.name), cor: _suave),
+            _celula(_situacao(i.status), cor: _suave),
           ]),
       ],
     );
@@ -110,9 +139,12 @@ class BackupPdf {
     }
 
     final grupos = <String, List<Item>>{
-      'Críticos': itens.where((i) => i.urgencia == Urgencia.critico).toList()..sort(ordem),
-      'Normais': itens.where((i) => i.urgencia == Urgencia.normal).toList()..sort(ordem),
-      'Discretos': itens.where((i) => i.urgencia == Urgencia.discreto).toList()..sort(ordem),
+      'Críticos': itens.where((i) => i.urgencia == Urgencia.critico).toList()
+        ..sort(ordem),
+      'Normais': itens.where((i) => i.urgencia == Urgencia.normal).toList()
+        ..sort(ordem),
+      'Discretos': itens.where((i) => i.urgencia == Urgencia.discreto).toList()
+        ..sort(ordem),
     };
     final ativos = itens.where((i) => i.status == StatusItem.ativo).length;
 
@@ -123,18 +155,41 @@ class BackupPdf {
         margin: const pw.EdgeInsets.fromLTRB(36, 36, 36, 44),
         footer: (ctx) => pw.Container(
           padding: const pw.EdgeInsets.only(top: 6),
-          decoration: const pw.BoxDecoration(border: pw.Border(top: pw.BorderSide(color: _linha, width: 0.5))),
-          child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-            pw.Text('Lembra • Gerado em $geradoEm', style: const pw.TextStyle(fontSize: 8, color: _suave)),
-            pw.Text('Página ${ctx.pageNumber} de ${ctx.pagesCount}',
-                style: const pw.TextStyle(fontSize: 8, color: _suave)),
-          ]),
+          decoration: const pw.BoxDecoration(
+            border: pw.Border(top: pw.BorderSide(color: _linha, width: 0.5)),
+          ),
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(
+                'Lembra - Gerado em $geradoEm',
+                style: const pw.TextStyle(fontSize: 8, color: _suave),
+              ),
+              pw.Text(
+                'Página ${ctx.pageNumber} de ${ctx.pagesCount}',
+                style: const pw.TextStyle(fontSize: 8, color: _suave),
+              ),
+            ],
+          ),
         ),
         build: (ctx) => [
-          pw.Text('Lembra', style: pw.TextStyle(fontSize: 26, fontWeight: pw.FontWeight.bold, color: _marca)),
+          pw.Text(
+            'Lembra',
+            style: pw.TextStyle(
+              fontSize: 26,
+              fontWeight: pw.FontWeight.bold,
+              color: _marca,
+            ),
+          ),
           pw.SizedBox(height: 2),
-          pw.Text('Backup dos lembretes', style: const pw.TextStyle(fontSize: 13, color: _texto)),
-          pw.Text('Gerado em $geradoEm', style: const pw.TextStyle(fontSize: 9, color: _suave)),
+          pw.Text(
+            'Backup dos lembretes',
+            style: const pw.TextStyle(fontSize: 13, color: _texto),
+          ),
+          pw.Text(
+            'Gerado em $geradoEm',
+            style: const pw.TextStyle(fontSize: 9, color: _suave),
+          ),
           pw.SizedBox(height: 16),
           pw.Row(children: [
             _quadro('Lembretes no total', '${itens.length}'),
@@ -143,11 +198,20 @@ class BackupPdf {
           ]),
           pw.SizedBox(height: 18),
           if (itens.isEmpty)
-            pw.Text('Nenhum lembrete salvo.', style: const pw.TextStyle(fontSize: 11, color: _suave)),
+            pw.Text(
+              'Nenhum lembrete salvo.',
+              style: const pw.TextStyle(fontSize: 11, color: _suave),
+            ),
           for (final e in grupos.entries)
             if (e.value.isNotEmpty) ...[
-              pw.Text('${e.key} (${e.value.length})',
-                  style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: _texto)),
+              pw.Text(
+                '${e.key} (${e.value.length})',
+                style: pw.TextStyle(
+                  fontSize: 13,
+                  fontWeight: pw.FontWeight.bold,
+                  color: _texto,
+                ),
+              ),
               pw.SizedBox(height: 6),
               _tabela(e.value),
               pw.SizedBox(height: 16),
@@ -158,27 +222,53 @@ class BackupPdf {
     return doc.save();
   }
 
-  /// Abre o menu de compartilhar (WhatsApp, e-mail, Drive, Salvar em arquivos)
-  /// com o PDF e o arquivo de texto usado para restaurar.
-  static Future<void> compartilhar({required List<Item> itens, required String backupTexto}) async {
+  /// Compartilha SOMENTE o PDF (WhatsApp, e-mail, Drive, Salvar em arquivos).
+  /// Um arquivo por chamada, para o WhatsApp tratá-lo como documento.
+  static Future<void> compartilharPdf({required List<Item> itens}) async {
     final dir = await getTemporaryDirectory();
     final data = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final nome = 'lembra-backup-$data.pdf';
 
-    final pdf = File('${dir.path}/lembra-backup-$data.pdf');
-    await pdf.writeAsBytes(await gerarPdf(itens));
-
-    final txt = File('${dir.path}/lembra-backup-$data.txt');
-    await txt.writeAsString(backupTexto);
+    final arquivo = File('${dir.path}/$nome');
+    await arquivo.writeAsBytes(await gerarPdf(itens), flush: true);
 
     await SharePlus.instance.share(
       ShareParams(
-        files: [
-          XFile(pdf.path, mimeType: 'application/pdf'),
-          XFile(txt.path, mimeType: 'text/plain'),
-        ],
+        files: [XFile(arquivo.path, mimeType: 'application/pdf', name: nome)],
         subject: 'Backup do Lembra',
-        text: 'Backup dos meus lembretes ($data).',
+        text: 'Backup dos meus lembretes ($data).', // legenda do PDF
       ),
     );
   }
-}
+
+  /// Compartilha SOMENTE o arquivo usado para restaurar os lembretes.
+  /// Extensão .json e mime próprio, para não ser lido como mensagem de texto.
+  /// Se o WhatsApp ainda colar o conteúdo, troque o mime por
+  /// 'application/octet-stream'.
+  static Future<void> compartilharRestauracao({
+    required String backupTexto,
+  }) async {
+    final dir = await getTemporaryDirectory();
+    final data = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final nome = 'lembra-backup-$data.json';
+
+    final arquivo = File('${dir.path}/$nome');
+    await arquivo.writeAsString(backupTexto, flush: true);
+
+        await SharePlus.instance.share(
+      ShareParams(
+        files: [
+          XFile(arquivo.path, mimeType: 'application/json', name: nome),
+        ],
+        subject: 'Backup do Lembra (restauração)',
+      ),
+    );
+  }
+
+  // ADICIONE AQUI, ainda dentro da classe:
+  static Future<void> compartilhar({
+    required List<Item> itens,
+    required String backupTexto,
+  }) =>
+      compartilharPdf(itens: itens);
+}   // <- chave que fecha a classe BackupPdf

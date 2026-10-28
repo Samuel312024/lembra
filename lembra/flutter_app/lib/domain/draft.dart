@@ -28,6 +28,7 @@ class Draft {
     this.horarioPadrao = false,
     this.valor,
     this.categoria,
+    this.somAlarmeId,
   })  : antecedencias = antecedencias ?? antecedenciasPadrao(tipo),
         camposFaltando = camposFaltando ?? [];
 
@@ -47,6 +48,9 @@ class Draft {
   bool horarioPadrao; // o horário foi preenchido com o padrão do usuário
   double? valor; // só para contas: valor em reais
   CategoriaConta? categoria; // só para contas: água, luz, ...
+
+  /// Som próprio do alarme (id de um SomAlarme). null = padrão de Ajustes.
+  String? somAlarmeId;
 
   /// Antecedências padrão por tipo (spec 4.4).
   static List<int> antecedenciasPadrao(TipoItem t) {
@@ -76,6 +80,7 @@ class Draft {
         origem: i.origem,
         valor: i.valor,
         categoria: i.categoria,
+        somAlarmeId: i.somAlarmeId,
       );
 
   bool get usaPrazo => tipo == TipoItem.tarefa || tipo == TipoItem.conta;
@@ -117,6 +122,7 @@ class Draft {
       responsavel: responsavel,
       valor: tipo == TipoItem.conta ? valor : null,
       categoria: tipo == TipoItem.conta ? categoria : null,
+      somAlarmeId: urgencia == Urgencia.critico ? somAlarmeId : null,
       criadoEm: t,
       atualizadoEm: t,
     );
@@ -136,6 +142,8 @@ class Draft {
     // Valor e tipo só existem em contas; ao mudar para outro tipo, somem.
     i.valor = tipo == TipoItem.conta ? valor : null;
     i.categoria = tipo == TipoItem.conta ? categoria : null;
+    // Som próprio só existe em alarme crítico.
+    i.somAlarmeId = urgencia == Urgencia.critico ? somAlarmeId : null;
     i.soneca = 0;
     i.atualizadoEm = DateTime.now();
     i.dirty = true;

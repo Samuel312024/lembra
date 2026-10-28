@@ -8,6 +8,7 @@ import '../domain/item.dart';
 import '../domain/recorrencia.dart';
 import 'agenda.dart';
 import 'item_tile.dart' show iconeDaCategoria;
+import 'widgets/seletor_som_alarme.dart';
 
 enum _Rep { nenhuma, diaria, uteis, semanal, mensal }
 
@@ -117,6 +118,8 @@ class _ItemFormPageState extends State<ItemFormPage> {
   void _salvar() {
     if (!_chave.currentState!.validate()) return;
     d.titulo = _titulo.text.trim();
+    // Som próprio só faz sentido em alarme crítico.
+    if (d.urgencia != Urgencia.critico) d.somAlarmeId = null;
     if (d.tipo == TipoItem.conta) {
       d.valor = lerReais(_valor.text);
     } else {
@@ -291,6 +294,14 @@ class _ItemFormPageState extends State<ItemFormPage> {
               },
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            if (d.urgencia == Urgencia.critico)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: SeletorSomAlarme(
+                  somId: d.somAlarmeId,
+                  aoMudar: (id) => setState(() => d.somAlarmeId = id),
+                ),
+              ),
             const SizedBox(height: 20),
             Text('Avisar antes', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),

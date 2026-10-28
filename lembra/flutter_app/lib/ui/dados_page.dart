@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/item.dart';
+import '../services/backup_pdf.dart';
 import '../services/diagnostico.dart';
 import '../state/providers.dart';
 
@@ -20,9 +21,13 @@ class DadosPage extends ConsumerStatefulWidget {
 }
 
 class _DadosPageState extends ConsumerState<DadosPage> {
+  bool _gerando = false;
+
   void _aviso(String texto) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(texto)));
 
-  Future<void> _copiarBackup() async {
+  /// Lê os lembretes e monta o texto do backup (o mesmo formato que o
+  /// "Restaurar backup" entende).
+  Future<(List<Item>, String)> _montarBackup() async {
     final itens = await ref.read(repoProvider).listar();
     final json = jsonEncode({
       'app': 'lembra',
@@ -30,6 +35,25 @@ class _DadosPageState extends ConsumerState<DadosPage> {
       'gerado_em': DateTime.now().toIso8601String(),
       'itens': [for (final i in itens) i.toMap()],
     });
+    return (itens, json);
+  }
+
+  /// Gera o PDF organizado e abre o menu de compartilhar (somente o PDF).
+  Future<void> _compartilharBackup() async {
+    if (_gerando) return;
+    setState(() => _gerando = true);
+    try {
+      final (itens, _) = await _montarBackup();
+      await BackupPdf.compartilharPdf(itens: itens);
+    } catch (e) {
+      if (mounted) _aviso('Não consegui gerar o backup. Tente de novo.');
+    } finally {
+      if (mounted) setState(() => _gerando = false);
+    }
+  }
+
+  Future<void> _copiarBackupTexto() async {
+    final (itens, json) = await _montarBackup();
     await Clipboard.setData(ClipboardData(text: json));
     if (!mounted) return;
     _aviso('Backup de ${itens.length} item(ns) copiado. Cole em um lugar seguro (notas, e-mail).');
@@ -47,7 +71,7 @@ class _DadosPageState extends ConsumerState<DadosPage> {
             controller: controle,
             maxLines: 6,
             decoration: const InputDecoration(
-              hintText: 'Cole aqui o backup copiado do Lembra',
+              hintText: 'Cole aqui o texto copiado em "Copiar backup como texto"',
               border: OutlineInputBorder(),
             ),
           ),
@@ -130,21 +154,26 @@ class _DadosPageState extends ConsumerState<DadosPage> {
         children: [
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Text(
-              'Backup: guarde seus lembretes fora do aparelho. Se você tem conta no Lembra, '
-              'eles também ficam salvos no servidor.',
-            ),
+            child: Text('Backup: guarde seus lembretes fora do aparelho.'),
+          ),
+          ListTile(
+            leading: _gerando
+                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.picture_as_pdf_outlined),
+            title: const Text('Compartilhar backup (PDF)'),
+            subtitle: const Text('Gera um PDF organizado com todos os seus lembretes'),
+            onTap: _gerando ? null : _compartilharBackup,
           ),
           ListTile(
             leading: const Icon(Icons.content_copy_outlined),
-            title: const Text('Copiar backup'),
-            subtitle: const Text('Copia todos os seus lembretes como texto'),
-            onTap: _copiarBackup,
+            title: const Text('Copiar backup como texto'),
+            subtitle: const Text('Copia todos os seus lembretes para restaurar depois'),
+            onTap: _copiarBackupTexto,
           ),
           ListTile(
             leading: const Icon(Icons.restore_outlined),
             title: const Text('Restaurar backup'),
-            subtitle: const Text('Cole um backup copiado antes'),
+            subtitle: const Text('Cole o texto de um backup feito antes'),
             onTap: _restaurarBackup,
           ),
           const Divider(),

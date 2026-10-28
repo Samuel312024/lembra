@@ -11,7 +11,7 @@ class ItemRepository {
   Future<Database> get _banco async {
     return _db ??= await openDatabase(
       p.join(await getDatabasesPath(), 'lembra.db'),
-      version: 2,
+            version: 3,
       onCreate: (db, versao) async {
         await db.execute('''
           CREATE TABLE itens (
@@ -32,15 +32,20 @@ class ItemRepository {
             concluido_em INTEGER,
             criado_em INTEGER NOT NULL,
             atualizado_em INTEGER NOT NULL,
-            dirty INTEGER NOT NULL DEFAULT 1
+            dirty INTEGER NOT NULL DEFAULT 1,
+            som_alarme_id TEXT
           )
         ''');
       },
-      // v2: valor e tipo das contas. Quem já tem o app instalado só ganha as colunas.
+      // v2: valor e tipo das contas. v3: som próprio do alarme.
+      // Quem já tem o app instalado só ganha as colunas, sem perder lembretes.
       onUpgrade: (db, antiga, nova) async {
         if (antiga < 2) {
           await db.execute('ALTER TABLE itens ADD COLUMN valor REAL');
           await db.execute('ALTER TABLE itens ADD COLUMN categoria TEXT');
+        }
+        if (antiga < 3) {
+          await db.execute('ALTER TABLE itens ADD COLUMN som_alarme_id TEXT');
         }
       },
     );

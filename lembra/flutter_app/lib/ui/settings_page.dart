@@ -34,9 +34,9 @@ class SettingsPage extends ConsumerWidget {
       body: ListView(
         children: [
           ListTile(
-            leading: const Icon(Icons.cloud_outlined),
-            title: const Text('Conta e sincronização'),
-            subtitle: Text(email ?? 'Usando só neste aparelho'),
+            // leading: const Icon(Icons.cloud_outlined),
+            // title: const Text('Conta e sincronização'),
+            // subtitle: Text(email ?? 'Usando só neste aparelho'),
             onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AccountPage())),
           ),
           SwitchListTile(
