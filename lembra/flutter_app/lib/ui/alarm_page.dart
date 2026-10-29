@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../domain/item.dart';
 import '../services/notification_service.dart';
 import '../state/providers.dart';
+// import '../services/alarme_som_nativo.dart';
 
 /// Tela cheia do alarme crítico: acende a tela, aparece por cima do bloqueio
 /// (ver `showWhenLocked`/`turnScreenOn` no AndroidManifest) e mostra a mensagem
@@ -35,6 +36,8 @@ class _AlarmPageState extends ConsumerState<AlarmPage> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
+        // Teste: toca o som por conta própria enquanto a tela de alarme está aberta.
+    // unawaited(AlarmeSomNativo.tocar(NotificationService.instance.somAlarme, repetir: true));
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     _pulso = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))
       ..repeat(reverse: true);
@@ -48,6 +51,7 @@ class _AlarmPageState extends ConsumerState<AlarmPage> with SingleTickerProvider
     _relogio?.cancel();
     _pulso.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    // unawaited(AlarmeSomNativo.parar());
     super.dispose();
   }
 
@@ -62,6 +66,7 @@ class _AlarmPageState extends ConsumerState<AlarmPage> with SingleTickerProvider
   Future<void> _agir(String? acao, Item? item) async {
     if (_agindo) return;
     setState(() => _agindo = true);
+    // unawaited(AlarmeSomNativo.parar());
     final servico = NotificationService.instance;
     await servico.pararAlarme(notificacaoId: widget.notificacaoId, item: item);
     if (item != null && acao != null) {

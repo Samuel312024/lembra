@@ -11,6 +11,7 @@ import 'package:timezone/timezone.dart' as tz;
 import '../domain/dinheiro.dart';
 import '../domain/item.dart';
 import 'alarm_notification.dart';
+import 'alarme_nativo.dart';
 import 'alarme_som_nativo.dart';
 
 /// Agenda lembretes e alarmes locais (funcionam com o app fechado e sem internet).
@@ -19,6 +20,8 @@ import 'alarme_som_nativo.dart';
 ///  - Android: alarme exato + tela cheia em todas as urgências (discreto, normal
 ///    e crítico), acendendo a tela mesmo apagada (exige permissões de alarme
 ///    exato e de tela cheia, pedidas de forma guiada nos Ajustes).
+///    O alarme CRÍTICO é agendado no serviço nativo (AlarmeStore/AlarmeService):
+///    som de alarme em loop, vibração, tela acesa e app aberto por cima de tudo.
 ///  - iOS: não existe alarme em segundo plano para apps comuns; usamos
 ///    notificações locais com som e prioridade "time-sensitive".
 class NotificationService {
@@ -131,9 +134,10 @@ class NotificationService {
     }
   }
 
-  /// Para o som do alarme (cancela a notificação insistente). Alarmes
+  /// Para o som do alarme (nativo e notificação insistente). Alarmes
   /// recorrentes são reagendados em seguida, para não perder os próximos.
   Future<void> pararAlarme({int? notificacaoId, Item? item}) async {
+    await AlarmeNativo.instance.parar(); // som, vibração e tela do alarme nativo
     if (notificacaoId != null) {
       await _plugin.cancel(notificacaoId);
     } else if (item != null) {
@@ -207,13 +211,17 @@ class NotificationService {
   int _base(String id) => int.parse(id.substring(0, 7), radix: 16) * 8;
 
   Future<void> cancelarItem(String id) async {
+    await AlarmeNativo.instance.cancelarItem(id);
     final base = _base(id);
     for (var i = 0; i < 8; i++) {
       await _plugin.cancel(base + i);
     }
   }
 
-  Future<void> cancelarTudo() => _plugin.cancelAll();
+  Future<void> cancelarTudo() async {
+    await AlarmeNativo.instance.cancelarTudo();
+    await _plugin.cancelAll();
+  }
 
   /// (Re)agenda todos os avisos do item. Seguro de chamar várias vezes.
   Future<void> agendarItem(Item item) async {
@@ -314,6 +322,30 @@ class NotificationService {
     DateTimeComponents? repetir,
     bool alarme = false,
   }) async {
+    // Alarme crítico no Android: vai para o serviço nativo (som em loop, tela cheia).
+    // Só o canal do alarme crítico tem esse prefixo; discreto e normal seguem como estavam.
+    final nativo = detalhes.android?.channelId.startsWith(kCanalAlarmePrefixo) ?? false;
+    if (alarme && nativo && AlarmeNativo.instance.disponivel) {
+      await AlarmeNativo.instance.agendar(
+        chave: 'a$id',
+        itemId: payload,
+        titulo: titulo,
+        corpo: corpo,
+        quando: quando,
+        freq: switch (repetir) {
+          DateTimeComponents.time => 'DAILY',
+          DateTimeComponents.dayOfWeekAndTime => 'WEEKLY',
+          DateTimeComponents.dayOfMonthAndTime => 'MONTHLY',
+          _ => null,
+        },
+        dia: quando.weekday, // 1 = segunda ... 7 = domingo, igual ao nativo
+        diaMes: quando.day,
+        hora: quando.hour,
+        minuto: quando.minute,
+      );
+      return;
+    }
+
     final data = tz.TZDateTime.from(quando, tz.local);
     // Alarmes levam o id da notificação no payload; a tela cheia busca
     // o resto (título, mensagem) no item.
