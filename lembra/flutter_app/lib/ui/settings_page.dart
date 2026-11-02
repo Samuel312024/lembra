@@ -26,6 +26,7 @@ class SettingsPage extends ConsumerWidget {
     final cfg = ref.watch(configProvider);
     final email = ref.watch(sessaoProvider);
     final som = ref.watch(somAlarmeProvider);
+    final tema = ref.watch(temaProvider);
     final android = defaultTargetPlatform == TargetPlatform.android;
     final notifier = ref.read(configProvider.notifier);
 
@@ -45,6 +46,25 @@ class SettingsPage extends ConsumerWidget {
             subtitle: const Text('Precisa de conta e internet. Sem isso, o app usa o interpretador do aparelho.'),
             value: cfg.usarIA,
             onChanged: (v) => notifier.salvar(cfg.copyWith(usarIA: v)),
+          ),
+          const Divider(),
+          const ListTile(
+            leading: Icon(Icons.brightness_6_outlined),
+            title: Text('Aparência'),
+            subtitle: Text('“Sistema” segue o modo claro ou escuro do celular.'),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: SegmentedButton<ThemeMode>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: ThemeMode.system, label: Text('Sistema')),
+                ButtonSegment(value: ThemeMode.light, label: Text('Claro')),
+                ButtonSegment(value: ThemeMode.dark, label: Text('Escuro')),
+              ],
+              selected: {tema},
+              onSelectionChanged: (s) => ref.read(temaProvider.notifier).definir(s.first),
+            ),
           ),
           const Divider(),
           ListTile(

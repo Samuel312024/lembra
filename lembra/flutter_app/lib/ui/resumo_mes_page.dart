@@ -109,7 +109,7 @@ class _ResumoMesPageState extends ConsumerState<ResumoMesPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(rotulo, style: t.bodySmall?.copyWith(color: AppColors.muted)),
+          Text(rotulo, style: t.bodySmall?.copyWith(color: context.cores.suave)),
           const SizedBox(height: 2),
           FittedBox(
             fit: BoxFit.scaleDown,
@@ -152,12 +152,12 @@ class _ResumoMesPageState extends ConsumerState<ResumoMesPage> {
                   child: LinearProgressIndicator(
                     value: maior > 0 ? valor / maior : 0,
                     minHeight: 6,
-                    color: AppColors.brand,
-                    backgroundColor: AppColors.cardBorder,
+                    color: context.cores.marca,
+                    backgroundColor: context.cores.borda,
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text('$percentual% do mês', style: t.bodySmall?.copyWith(color: AppColors.muted)),
+                Text('$percentual% do mês', style: t.bodySmall?.copyWith(color: context.cores.suave)),
               ],
             ),
           ),
@@ -190,13 +190,13 @@ class _ResumoMesPageState extends ConsumerState<ResumoMesPage> {
                   child: Text(formatarReais(r.total), style: AppText.mono(size: 32)),
                 ),
                 const SizedBox(height: 14),
-                const Divider(height: 1, color: AppColors.cardBorder),
+                Divider(height: 1, color: context.cores.borda),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    _numero(context, 'Já pago', r.pago, const Color(0xFF15803D)),
+                    _numero(context, 'Já pago', r.pago, context.cores.sucesso),
                     const SizedBox(width: 12),
-                    _numero(context, 'A pagar', r.aPagar, r.aPagar > 0 ? AppColors.brand : AppColors.ink),
+                    _numero(context, 'A pagar', r.aPagar, r.aPagar > 0 ? context.cores.marca : context.cores.texto),
                   ],
                 ),
                 if (r.semValor > 0) ...[
@@ -205,7 +205,7 @@ class _ResumoMesPageState extends ConsumerState<ResumoMesPage> {
                     r.semValor == 1
                         ? '1 conta do mês está sem valor e não entrou na soma.'
                         : '${r.semValor} contas do mês estão sem valor e não entraram na soma.',
-                    style: t.bodySmall?.copyWith(color: AppColors.muted),
+                    style: t.bodySmall?.copyWith(color: context.cores.suave),
                   ),
                 ],
               ],
@@ -221,7 +221,7 @@ class _ResumoMesPageState extends ConsumerState<ResumoMesPage> {
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
             child: Text(
               'Nenhuma conta com valor neste mês. Informe o valor ao cadastrar uma conta para ver o resumo.',
-              style: t.bodyMedium?.copyWith(color: AppColors.muted),
+              style: t.bodyMedium?.copyWith(color: context.cores.suave),
             ),
           )
         else
@@ -235,7 +235,7 @@ class _ResumoMesPageState extends ConsumerState<ResumoMesPage> {
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
           child: Text(
             'Contas que se repetem mostram apenas o último pagamento feito.',
-            style: t.bodySmall?.copyWith(color: AppColors.muted),
+            style: t.bodySmall?.copyWith(color: context.cores.suave),
           ),
         ),
       ],

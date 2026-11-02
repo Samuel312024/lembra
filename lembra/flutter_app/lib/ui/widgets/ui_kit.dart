@@ -23,12 +23,13 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.cores;
     return Material(
-      color: AppColors.card,
+      color: c.cartao,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: AppColors.cardBorder),
+        side: BorderSide(color: c.borda),
       ),
       child: InkWell(
         onTap: onTap,
@@ -80,7 +81,7 @@ class SectionHeader extends StatelessWidget {
         Text(title, style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
         if (count != null) ...[
           const SizedBox(width: 8),
-          Text('$count', style: t.bodySmall?.copyWith(color: AppColors.muted)),
+          Text('$count', style: t.bodySmall?.copyWith(color: context.cores.suave)),
         ],
       ],
     );
@@ -179,12 +180,12 @@ class ReminderTile extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (metaIcon != null) ...[
-                            Icon(metaIcon, size: 14, color: AppColors.muted),
+                            Icon(metaIcon, size: 14, color: context.cores.suave),
                             const SizedBox(width: 4),
                           ],
                           Text(
                             meta!,
-                            style: t.bodySmall?.copyWith(color: AppColors.muted),
+                            style: t.bodySmall?.copyWith(color: context.cores.suave),
                           ),
                         ],
                       ),
@@ -238,7 +239,7 @@ class StatCard extends StatelessWidget {
               IconBadge(icon: icon, color: iconColor, size: 40),
               if (onTap != null) ...[
                 const Spacer(),
-                const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+                Icon(Icons.chevron_right_rounded, color: context.cores.suave),
               ],
             ],
           ),
@@ -252,7 +253,7 @@ class StatCard extends StatelessWidget {
             child: Text(value, maxLines: 1, style: AppText.mono(size: 24, color: valueColor)),
           ),
           const SizedBox(height: 4),
-          Text(caption, style: t.bodySmall?.copyWith(color: AppColors.muted)),
+          Text(caption, style: t.bodySmall?.copyWith(color: context.cores.suave)),
         ],
       ),
     );
@@ -457,9 +458,9 @@ class BottomActionBar extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: AppColors.cardBorder)),
+      decoration: BoxDecoration(
+        color: context.cores.cartao,
+        border: Border(top: BorderSide(color: context.cores.borda)),
       ),
       child: SafeArea(
         top: false,
@@ -471,7 +472,7 @@ class BottomActionBar extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title, style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                  Text(subtitle, style: t.bodySmall?.copyWith(color: AppColors.muted)),
+                  Text(subtitle, style: t.bodySmall?.copyWith(color: context.cores.suave)),
                 ],
               ),
             ),

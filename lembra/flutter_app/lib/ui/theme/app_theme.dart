@@ -3,6 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 
 /// Paleta tirada dos protótipos: fundo creme, hero verde-floresta,
 /// laranja queimado como cor de ação e cores vivas só para categorias/status.
+///
+/// Estas são as cores do tema CLARO e as cores que não mudam entre os temas
+/// (hero, laranja, categorias). Para as cores que mudam entre claro e escuro
+/// (fundo, cartão, texto...), use `context.cores` (veja [Cores] abaixo).
 class AppColors {
   AppColors._();
 
@@ -36,15 +40,137 @@ class AppColors {
   static const slate = Color(0xFF8FA0B5);
 }
 
+/// Cores que mudam entre o tema claro e o escuro. Acesse com `context.cores`.
+@immutable
+class Cores extends ThemeExtension<Cores> {
+  const Cores({
+    required this.fundo,
+    required this.cartao,
+    required this.borda,
+    required this.campo,
+    required this.texto,
+    required this.suave,
+    required this.marca,
+    required this.perigo,
+    required this.sucesso,
+    required this.ciano,
+  });
+
+  /// Fundo das telas.
+  final Color fundo;
+
+  /// Cartões, barras e folhas.
+  final Color cartao;
+
+  /// Bordas finas e divisórias.
+  final Color borda;
+
+  /// Fundo dos campos de texto.
+  final Color campo;
+
+  /// Texto principal.
+  final Color texto;
+
+  /// Texto de apoio (legendas, rótulos pequenos).
+  final Color suave;
+
+  /// Cor de destaque para texto, bordas e ícones (laranja).
+  final Color marca;
+
+  /// Vermelho legível: atrasos e contas vencidas.
+  final Color perigo;
+
+  /// Verde legível: valores já pagos.
+  final Color sucesso;
+
+  /// Azul-ciano legível: valores em destaque.
+  final Color ciano;
+
+  static const claro = Cores(
+    fundo: AppColors.cream,
+    cartao: AppColors.card,
+    borda: AppColors.cardBorder,
+    campo: AppColors.field,
+    texto: AppColors.ink,
+    suave: AppColors.muted,
+    marca: AppColors.brand,
+    perigo: Color(0xFFDC2626),
+    sucesso: Color(0xFF15803D),
+    ciano: AppColors.cyanDeep,
+  );
+
+  static const escuro = Cores(
+    fundo: Color(0xFF141A17),
+    cartao: Color(0xFF1F2823),
+    borda: Color(0xFF34403A),
+    campo: Color(0xFF27322C),
+    texto: Color(0xFFEDE8DF),
+    suave: Color(0xFFA3AEA3),
+    marca: AppColors.brandSoft,
+    perigo: Color(0xFFF87171),
+    sucesso: Color(0xFF4ADE80),
+    ciano: AppColors.cyan,
+  );
+
+  @override
+  Cores copyWith({
+    Color? fundo,
+    Color? cartao,
+    Color? borda,
+    Color? campo,
+    Color? texto,
+    Color? suave,
+    Color? marca,
+    Color? perigo,
+    Color? sucesso,
+    Color? ciano,
+  }) =>
+      Cores(
+        fundo: fundo ?? this.fundo,
+        cartao: cartao ?? this.cartao,
+        borda: borda ?? this.borda,
+        campo: campo ?? this.campo,
+        texto: texto ?? this.texto,
+        suave: suave ?? this.suave,
+        marca: marca ?? this.marca,
+        perigo: perigo ?? this.perigo,
+        sucesso: sucesso ?? this.sucesso,
+        ciano: ciano ?? this.ciano,
+      );
+
+  @override
+  Cores lerp(ThemeExtension<Cores>? other, double t) {
+    if (other is! Cores) return this;
+    return Cores(
+      fundo: Color.lerp(fundo, other.fundo, t)!,
+      cartao: Color.lerp(cartao, other.cartao, t)!,
+      borda: Color.lerp(borda, other.borda, t)!,
+      campo: Color.lerp(campo, other.campo, t)!,
+      texto: Color.lerp(texto, other.texto, t)!,
+      suave: Color.lerp(suave, other.suave, t)!,
+      marca: Color.lerp(marca, other.marca, t)!,
+      perigo: Color.lerp(perigo, other.perigo, t)!,
+      sucesso: Color.lerp(sucesso, other.sucesso, t)!,
+      ciano: Color.lerp(ciano, other.ciano, t)!,
+    );
+  }
+}
+
+extension CoresDoTema on BuildContext {
+  /// Cores do tema atual (claro ou escuro).
+  Cores get cores => Theme.of(this).extension<Cores>() ?? Cores.claro;
+}
+
 /// Estilos extras que não cabem no TextTheme padrão.
 class AppText {
   AppText._();
 
   /// Fonte monoespaçada para horários e valores (07:00, R$ 842,50).
+  /// Sem [color], o texto usa a cor do tema (clara ou escura).
   static TextStyle mono({
     double size = 16,
     FontWeight weight = FontWeight.w700,
-    Color color = AppColors.ink,
+    Color? color,
   }) {
     return GoogleFonts.jetBrainsMono(
       fontSize: size,
@@ -54,30 +180,45 @@ class AppText {
   }
 }
 
-ThemeData buildAppTheme() {
-  final scheme = ColorScheme.fromSeed(
+/// Tema do app. `buildAppTheme()` é o claro (como sempre foi);
+/// `buildAppTheme(brightness: Brightness.dark)` é o escuro.
+ThemeData buildAppTheme({Brightness brightness = Brightness.light}) {
+  final escuro = brightness == Brightness.dark;
+  final c = escuro ? Cores.escuro : Cores.claro;
+
+  var scheme = ColorScheme.fromSeed(
     seedColor: AppColors.brand,
-    brightness: Brightness.light,
+    brightness: brightness,
   ).copyWith(
-    primary: AppColors.brand,
-    onPrimary: Colors.white,
-    surface: AppColors.cream,
-    onSurface: AppColors.ink,
-    outline: AppColors.cardBorder,
+    primary: escuro ? AppColors.brandSoft : AppColors.brand,
+    onPrimary: escuro ? AppColors.ink : Colors.white,
+    surface: c.fundo,
+    onSurface: c.texto,
+    outline: escuro ? const Color(0xFF4A5750) : AppColors.cardBorder,
   );
+  if (escuro) {
+    // Diálogos, folhas e menus usam estas superfícies: ficam no tom do app.
+    scheme = scheme.copyWith(
+      surfaceContainerLowest: c.fundo,
+      surfaceContainerLow: c.cartao,
+      surfaceContainer: c.cartao,
+      surfaceContainerHigh: c.cartao,
+      surfaceContainerHighest: c.campo,
+    );
+  }
 
   final base = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
-    brightness: Brightness.light,
+    brightness: brightness,
   );
 
   final fontFamily = GoogleFonts.plusJakartaSans().fontFamily;
-final text = base.textTheme.apply(
-  fontFamily: fontFamily,
-  bodyColor: AppColors.ink,
-  displayColor: AppColors.ink,
-);
+  final text = base.textTheme.apply(
+    fontFamily: fontFamily,
+    bodyColor: c.texto,
+    displayColor: c.texto,
+  );
 
   OutlineInputBorder border(Color color, [double width = 1]) {
     return OutlineInputBorder(
@@ -87,11 +228,12 @@ final text = base.textTheme.apply(
   }
 
   return base.copyWith(
-    scaffoldBackgroundColor: AppColors.cream,
+    scaffoldBackgroundColor: c.fundo,
     textTheme: text,
+    extensions: <ThemeExtension<dynamic>>[c],
     appBarTheme: AppBarTheme(
-      backgroundColor: AppColors.cream,
-      foregroundColor: AppColors.ink,
+      backgroundColor: c.fundo,
+      foregroundColor: c.texto,
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
@@ -108,15 +250,27 @@ final text = base.textTheme.apply(
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: AppColors.field,
+      fillColor: c.campo,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      border: border(AppColors.cardBorder),
-      enabledBorder: border(AppColors.cardBorder),
-      focusedBorder: border(AppColors.brand, 1.5),
+      border: border(c.borda),
+      enabledBorder: border(c.borda),
+      focusedBorder: border(c.marca, 1.5),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: Colors.white,
-      indicatorColor: AppColors.brand.withValues(alpha: 0.14),
+      backgroundColor: c.cartao,
+      indicatorColor: c.marca.withValues(alpha: 0.14),
     ),
+    // Só no escuro: divisórias e avisos (SnackBar) no tom do app.
+    dividerTheme: escuro ? DividerThemeData(color: c.borda) : null,
+    snackBarTheme: escuro
+        ? SnackBarThemeData(
+            backgroundColor: const Color(0xFF2E3833),
+            contentTextStyle: text.bodyMedium?.copyWith(color: c.texto),
+            actionTextColor: AppColors.brandSoft,
+          )
+        : null,
   );
 }
+
+/// Tema escuro do app.
+ThemeData buildDarkTheme() => buildAppTheme(brightness: Brightness.dark);

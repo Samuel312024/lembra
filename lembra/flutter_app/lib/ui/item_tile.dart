@@ -82,8 +82,6 @@ Urgency _urgencia(Item item) {
   return Urgency.normal;
 }
 
-const _vermelhoAtraso = Color(0xFFDC2626);
-
 /// Linha da agenda. Deslizar para a direita conclui; para a esquerda cancela.
 class ItemTile extends StatelessWidget {
   const ItemTile({
@@ -117,12 +115,12 @@ class ItemTile extends StatelessWidget {
       child: Opacity(
         opacity: feito ? 0.65 : 1,
         child: Material(
-          color: AppColors.card,
+          color: context.cores.cartao,
           clipBehavior: Clip.antiAlias,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
             side: BorderSide(
-              color: destaque ? corCritico : AppColors.cardBorder,
+              color: destaque ? corCritico : context.cores.borda,
               width: destaque ? 1.5 : 1,
             ),
           ),
@@ -157,7 +155,7 @@ class ItemTile extends StatelessWidget {
                             Text(
                               _meta(item, agora),
                               style: t.bodySmall?.copyWith(
-                                color: atrasado ? _vermelhoAtraso : AppColors.muted,
+                                color: atrasado ? context.cores.perigo : context.cores.suave,
                                 fontWeight: atrasado ? FontWeight.w600 : null,
                               ),
                             ),
@@ -177,7 +175,7 @@ class ItemTile extends StatelessWidget {
                           Text(
                             DateFormat.Hm('pt_BR').format(a),
                             style: mostraValor
-                                ? AppText.mono(size: 12, weight: FontWeight.w500, color: AppColors.muted)
+                                ? AppText.mono(size: 12, weight: FontWeight.w500, color: context.cores.suave)
                                 : AppText.mono(size: 15),
                           ),
                       ],

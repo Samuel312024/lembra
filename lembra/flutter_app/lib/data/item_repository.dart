@@ -6,12 +6,17 @@ import '../domain/item.dart';
 /// Persistência local (SQLite). O app funciona 100% offline; a sincronização
 /// com o backend envia apenas os itens marcados como "dirty".
 class ItemRepository {
-  Database? _db;
+  // AJUSTE: guarda o Future da abertura (e não o Database já aberto). Assim,
+  // se várias partes do app pedirem o banco ao mesmo tempo no início, todas
+  // esperam a MESMA abertura em vez de cada uma abrir o banco de novo.
+  Future<Database>? _abrindo;
 
-  Future<Database> get _banco async {
-    return _db ??= await openDatabase(
+  Future<Database> get _banco => _abrindo ??= _abrir();
+
+  Future<Database> _abrir() async {
+    return openDatabase(
       p.join(await getDatabasesPath(), 'lembra.db'),
-            version: 3,
+      version: 3,
       onCreate: (db, versao) async {
         await db.execute('''
           CREATE TABLE itens (

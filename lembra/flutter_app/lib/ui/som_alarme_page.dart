@@ -18,23 +18,23 @@ class SomAlarmePage extends ConsumerWidget {
           texto,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,
-                color: AppColors.muted,
+                color: context.cores.suave,
               ),
         ),
       );
 
-  Widget _opcao(WidgetRef ref, SomAlarme som, SomAlarme atual) {
+  Widget _opcao(BuildContext context, WidgetRef ref, SomAlarme som, SomAlarme atual) {
     final escolhido = som.id == atual.id;
     return ListTile(
       leading: Icon(
         som.doCelular ? Icons.phone_android_outlined : Icons.music_note_outlined,
-        color: escolhido ? AppColors.brand : AppColors.muted,
+        color: escolhido ? context.cores.marca : context.cores.suave,
       ),
       title: Text(som.rotulo, style: TextStyle(fontWeight: escolhido ? FontWeight.w700 : FontWeight.w500)),
       subtitle: Text(som.descricao),
       trailing: escolhido
-          ? const Icon(Icons.check_circle, color: AppColors.brand)
-          : const Icon(Icons.radio_button_unchecked, color: AppColors.cardBorder),
+          ? Icon(Icons.check_circle, color: context.cores.marca)
+          : Icon(Icons.radio_button_unchecked, color: context.cores.suave.withValues(alpha: 0.5)),
       onTap: () => ref.read(somAlarmeProvider.notifier).escolher(som),
     );
   }
@@ -59,9 +59,9 @@ class SomAlarmePage extends ConsumerWidget {
             ),
           ),
           _titulo(context, 'SONS DO CELULAR'),
-          for (final s in celular) _opcao(ref, s, atual),
+          for (final s in celular) _opcao(context, ref, s, atual),
           _titulo(context, 'SONS DO LEMBRA'),
-          for (final s in app) _opcao(ref, s, atual),
+          for (final s in app) _opcao(context, ref, s, atual),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
             child: OutlinedButton.icon(

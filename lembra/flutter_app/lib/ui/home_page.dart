@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../domain/dinheiro.dart';
 import '../domain/draft.dart';
@@ -14,6 +15,7 @@ import 'contas_page.dart';
 import 'item_form_page.dart';
 import 'item_tile.dart';
 import 'resumo_contas.dart';
+import 'reunioes_page.dart';
 import 'review_page.dart';
 import 'settings_page.dart';
 import 'theme/app_theme.dart';
@@ -21,7 +23,7 @@ import 'voice_flow.dart';
 import 'widgets/ui_kit.dart';
 import '../services/compartilhar_app.dart';
 
-/// Tela "Hoje" (home) com a aba "Próximos" e filtro por tipo.
+/// Tela "Hoje" (home) com as abas "Próximos" e "Reuniões" e filtro por tipo.
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
@@ -66,10 +68,14 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
     if (mounted) await _permissoesGuiadas();
   }
 
-  /// Na primeira abertura, explica por que as permissões são necessárias antes de pedir.
+  /// Na primeira abertura, e em toda abertura enquanto as notificações estiverem
+  /// desligadas, explica por que as permissões são necessárias antes de pedir.
   Future<void> _permissoesGuiadas() async {
     final prefs = ref.read(prefsProvider);
-    if (prefs.getBool('permissoes_pedidas') ?? false) return;
+    final jaPediu = prefs.getBool('permissoes_pedidas') ?? false;
+    final notificacoesOk = await Permission.notification.isGranted;
+    if (jaPediu && notificacoesOk) return;
+    if (!mounted) return;
     final ok = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -88,7 +94,13 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
       ),
     );
     await prefs.setBool('permissoes_pedidas', true);
-    if (ok == true) await NotificationService.instance.pedirPermissoes();
+    if (ok == true) {
+      await NotificationService.instance.pedirPermissoes();
+      // Se o Android não mostra mais o pedido (negado antes), leva para os ajustes do app.
+      if (await Permission.notification.isPermanentlyDenied) {
+        await openAppSettings();
+      }
+    }
   }
 
   Future<void> _novoManual() async {
@@ -129,10 +141,160 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
         key: ValueKey('${i.id}-$feito'),
         item: i,
         feito: feito,
-        onTap: () => _editar(i),
+        onTap: () => _abrirDetalhes(i, feito: feito),
         onConcluir: () => _concluir(i),
         onCancelar: () => _cancelar(i),
       );
+
+  // -------------------------------------------------------------------------
+  // Detalhes do item (modal)
+  // -------------------------------------------------------------------------
+
+  /// Toque no card: abre um modal com tudo o que está escrito no item, sem corte,
+  /// para dar para ler com calma. De lá o usuário edita, conclui ou cancela.
+  void _abrirDetalhes(Item item, {bool feito = false}) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: AppColors.cream,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      builder: (ctx) => _detalhesItem(ctx, item, feito),
+    );
+  }
+
+  /// Uma linha do modal: ícone, rótulo pequeno e o texto inteiro (selecionável).
+  Widget _linhaDetalhe(BuildContext ctx, IconData icone, String rotulo, String texto) {
+    final t = Theme.of(ctx).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icone, size: 20, color: AppColors.muted),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(rotulo, style: t.labelMedium?.copyWith(color: AppColors.muted)),
+                const SizedBox(height: 2),
+                SelectableText(texto, style: t.bodyLarge?.copyWith(color: AppColors.ink)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detalhesItem(BuildContext ctx, Item item, bool feito) {
+    final t = Theme.of(ctx).textTheme;
+    String maiuscula(String s) => toBeginningOfSentenceCase(s) ?? s;
+
+    final a = item.ancora;
+    final String quando;
+    if (a == null) {
+      quando = 'Sem data';
+    } else if (a.hour == 0 && a.minute == 0) {
+      quando = '${maiuscula(DateFormat("EEEE, d 'de' MMMM", 'pt_BR').format(a))} • sem horário definido';
+    } else {
+      quando = maiuscula(DateFormat("EEEE, d 'de' MMMM 'às' HH:mm", 'pt_BR').format(a));
+    }
+
+    final repete = item.regra?.descricao;
+    final mostrarValor = item.tipo == TipoItem.conta && item.valor != null;
+    final urgencia = switch (item.urgencia) {
+      Urgencia.discreto => 'Discreto (sem som)',
+      Urgencia.normal => 'Normal',
+      Urgencia.critico => 'Crítico (alarme com som)',
+    };
+
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                item.tipo.rotulo.toUpperCase(),
+                style: t.labelLarge?.copyWith(
+                  color: AppColors.brand,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 6),
+              SelectableText(
+                item.titulo,
+                style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: AppColors.ink),
+              ),
+              _linhaDetalhe(ctx, Icons.event_rounded, 'Quando', quando),
+              if (repete != null && repete.isNotEmpty)
+                _linhaDetalhe(ctx, Icons.repeat_rounded, 'Repete', repete),
+              if (mostrarValor)
+                _linhaDetalhe(ctx, Icons.account_balance_wallet_rounded, 'Valor', formatarReais(item.valor!)),
+              _linhaDetalhe(ctx, Icons.notifications_active_outlined, 'Aviso', urgencia),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  _editar(item);
+                },
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Editar'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                  backgroundColor: AppColors.brand,
+                  shape: const StadiumBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  if (!feito) ...[
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          _concluir(item);
+                        },
+                        icon: const Icon(Icons.check_rounded),
+                        label: const Text('Feito'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                          shape: const StadiumBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        _cancelar(item);
+                      },
+                      icon: const Icon(Icons.close_rounded),
+                      label: const Text('Cancelar'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        foregroundColor: AppColors.red,
+                        shape: const StadiumBorder(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   // -------------------------------------------------------------------------
   // Visual
@@ -158,13 +320,23 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
         ),
       );
 
+  /// Chip de filtro. O nome nunca é cortado dentro do chip: sem quebra de
+  /// linha e sem reticências. Se a faixa não couber na tela, quem rola para o
+  /// lado é a faixa (veja o build), não o texto.
   Widget _chip(String rotulo, bool selecionado, VoidCallback aoTocar) => Padding(
         padding: const EdgeInsets.only(right: 8),
         child: ChoiceChip(
-          label: Text(rotulo),
+          label: Text(
+            rotulo,
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.visible,
+          ),
           selected: selecionado,
           onSelected: (_) => aoTocar(),
           showCheckmark: false,
+          visualDensity: VisualDensity.compact,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           shape: const StadiumBorder(),
           backgroundColor: Colors.white,
           selectedColor: AppColors.brand.withValues(alpha: 0.14),
@@ -297,7 +469,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
                 item: i,
                 onTap: () {
                   Navigator.of(ctx).pop();
-                  _editar(i);
+                  _abrirDetalhes(i);
                 },
                 onConcluir: () => _concluir(i),
                 onCancelar: () => _cancelar(i),
@@ -493,7 +665,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: DefaultTabController(
-        length: 2,
+        length: 3,
         child: Scaffold(
           body: Column(
             children: [
@@ -554,7 +726,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
                             labelColor: AppColors.onDark,
                             unselectedLabelColor: AppColors.onDarkMuted,
                             labelStyle: TextStyle(fontWeight: FontWeight.w700),
-                            tabs: [Tab(text: 'Hoje'), Tab(text: 'Próximos')],
+                            tabs: [Tab(text: 'Hoje'), Tab(text: 'Próximos'), Tab(text: 'Reuniões')],
                           ),
                         ),
                         _acao(Icons.share_outlined, 'Compartilhar o Lembra', CompartilharApp.compartilhar),
@@ -563,27 +735,42 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
                   ],
                 ),
               ),
-              SizedBox(
-                height: 56,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  children: [
-                    _chip('Todos', _filtro == null, () => setState(() => _filtro = null)),
-                    for (final tipo in TipoItem.values)
-                      _chip(
-                        tipo.rotulo,
-                        _filtro == tipo,
-                        () => setState(() => _filtro = _filtro == tipo ? null : tipo),
+              // Filtros por tipo: uma linha só, desliza com o dedo para o lado.
+              // O nome dentro de cada chip nunca é cortado (veja _chip).
+              // Ficam escondidos na aba "Reuniões" (índice 2), onde não se aplicam.
+              Builder(
+                builder: (ctx) {
+                  final aba = DefaultTabController.of(ctx);
+                  return AnimatedBuilder(
+                    animation: aba,
+                    builder: (_, filtros) => aba.index == 2 ? const SizedBox.shrink() : filtros!,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _chip('Todos', _filtro == null, () => setState(() => _filtro = null)),
+                          for (final tipo in TipoItem.values)
+                            _chip(
+                              tipo.rotulo,
+                              _filtro == tipo,
+                              () => setState(() => _filtro = _filtro == tipo ? null : tipo),
+                            ),
+                        ],
                       ),
-                  ],
-                ),
+                    ),
+                  );
+                },
               ),
               Expanded(
                 child: itens.when(
                   loading: () => const Center(child: CircularProgressIndicator()),
                   error: (e, _) => Center(child: Text('Erro ao carregar: $e')),
-                  data: (lista) => TabBarView(children: [_abaHoje(lista), _abaProximos(lista)]),
+                  data: (lista) => TabBarView(
+                    children: [_abaHoje(lista), _abaProximos(lista), const ReunioesPage()],
+                  ),
                 ),
               ),
             ],

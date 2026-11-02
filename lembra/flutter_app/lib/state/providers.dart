@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -91,6 +92,32 @@ class ConfigNotifier extends Notifier<Config> {
 
 final configProvider = NotifierProvider<ConfigNotifier, Config>(ConfigNotifier.new);
 
+// ---------- aparência (claro / escuro / sistema) ----------
+
+/// Modo de cor do app. Padrão: segue o sistema; o usuário troca em Ajustes > Aparência.
+class TemaNotifier extends Notifier<ThemeMode> {
+  static const _chave = 'tema';
+
+  @override
+  ThemeMode build() => switch (ref.read(prefsProvider).getString(_chave)) {
+        'claro' => ThemeMode.light,
+        'escuro' => ThemeMode.dark,
+        _ => ThemeMode.system,
+      };
+
+  Future<void> definir(ThemeMode modo) async {
+    state = modo;
+    final valor = switch (modo) {
+      ThemeMode.light => 'claro',
+      ThemeMode.dark => 'escuro',
+      ThemeMode.system => 'sistema',
+    };
+    await ref.read(prefsProvider).setString(_chave, valor);
+  }
+}
+
+final temaProvider = NotifierProvider<TemaNotifier, ThemeMode>(TemaNotifier.new);
+
 // ---------- conta ----------
 
 /// E-mail da conta conectada (null = usando só no aparelho).
@@ -125,6 +152,11 @@ final sessaoProvider = NotifierProvider<SessaoNotifier, String?>(SessaoNotifier.
 class ItemsNotifier extends AsyncNotifier<List<Item>> {
   ItemRepository get _repo => ref.read(repoProvider);
   NotificationService get _notif => NotificationService.instance;
+
+  // AJUSTE: controle do reagendamento de notificações.
+  bool _reagendando = false;
+  bool _reagendarDeNovo = false;
+  DateTime? _ultimoReagendamento;
 
   @override
   Future<List<Item>> build() => _repo.listar();
@@ -261,25 +293,50 @@ class ItemsNotifier extends AsyncNotifier<List<Item>> {
   }
 
   /// Reagenda todos os alarmes (após reiniciar o aparelho, mudar o fuso ou sincronizar).
+  ///
+  /// AJUSTE: nunca roda duas vezes ao mesmo tempo. Se alguém pedir enquanto uma
+  /// rodada está em andamento, ela faz UMA rodada extra no fim (cobre o que
+  /// mudou nesse meio tempo) em vez de empilhar várias rodadas pesadas.
   Future<void> reagendarNotificacoes() async {
-    final todos = await _repo.listar(incluirCancelados: true);
-    for (final i in todos) {
-      await _notif.agendarItem(i);
+    if (_reagendando) {
+      _reagendarDeNovo = true;
+      return;
+    }
+    _reagendando = true;
+    try {
+      do {
+        _reagendarDeNovo = false;
+        final todos = await _repo.listar(incluirCancelados: true);
+        for (final i in todos) {
+          await _notif.agendarItem(i);
+        }
+      } while (_reagendarDeNovo);
+      _ultimoReagendamento = DateTime.now();
+    } finally {
+      _reagendando = false;
     }
   }
 
   Future<bool> sincronizar() async {
     final mudou = await SyncService(_repo, ref.read(apiProvider), ref.read(prefsProvider)).sincronizar();
     if (mudou) {
-      await reagendarNotificacoes();
+      // AJUSTE: primeiro atualiza os cards na tela; os alarmes são
+      // reagendados depois, sem segurar a lista.
       await _recarregar();
+      unawaited(reagendarNotificacoes());
     }
     return mudou;
   }
 
   Future<void> aoRetomar() async {
+    // AJUSTE: os cards recarregam na hora. Reagendar TODOS os alarmes a cada
+    // vez que o app volta para a frente é pesado e desnecessário: os alarmes já
+    // agendados continuam valendo. Só refaz se passou mais de 30 minutos.
     await _recarregar();
-    await reagendarNotificacoes();
+    final ultimo = _ultimoReagendamento;
+    if (ultimo == null || DateTime.now().difference(ultimo) > const Duration(minutes: 30)) {
+      unawaited(reagendarNotificacoes());
+    }
     unawaited(sincronizar());
   }
 

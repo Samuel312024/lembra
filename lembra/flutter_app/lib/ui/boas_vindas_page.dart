@@ -113,9 +113,10 @@ class _BoasVindasPageState extends State<BoasVindasPage> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
+    final c = context.cores;
 
     return Scaffold(
-      backgroundColor: AppColors.cream,
+      backgroundColor: c.fundo,
       body: SafeArea(
         child: Column(
           children: [
@@ -149,13 +150,13 @@ class _BoasVindasPageState extends State<BoasVindasPage> {
                         Text(
                           p.titulo,
                           textAlign: TextAlign.center,
-                          style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: AppColors.ink),
+                          style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: c.texto),
                         ),
                         const SizedBox(height: 12),
                         Text(
                           p.texto,
                           textAlign: TextAlign.center,
-                          style: t.bodyLarge?.copyWith(color: AppColors.muted, height: 1.4),
+                          style: t.bodyLarge?.copyWith(color: c.suave, height: 1.4),
                         ),
                         if (permissoes) ...[
                           const SizedBox(height: 24),
@@ -166,7 +167,7 @@ class _BoasVindasPageState extends State<BoasVindasPage> {
                           ),
                           if (_resultado != null) ...[
                             const SizedBox(height: 10),
-                            Text(_resultado!, textAlign: TextAlign.center, style: t.bodySmall?.copyWith(color: AppColors.muted)),
+                            Text(_resultado!, textAlign: TextAlign.center, style: t.bodySmall?.copyWith(color: c.suave)),
                           ],
                         ],
                       ],
@@ -186,7 +187,7 @@ class _BoasVindasPageState extends State<BoasVindasPage> {
                     height: 8,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(4),
-                      color: i == _pagina ? AppColors.brand : AppColors.cardBorder,
+                      color: i == _pagina ? c.marca : c.suave.withValues(alpha: 0.35),
                     ),
                   ),
               ],

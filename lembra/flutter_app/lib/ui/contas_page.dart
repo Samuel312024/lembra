@@ -19,8 +19,6 @@ import 'resumo_mes_page.dart';
 import 'theme/app_theme.dart';
 import 'widgets/ui_kit.dart';
 
-const _vermelho = Color(0xFFDC2626);
-
 class ContasPage extends ConsumerStatefulWidget {
   const ContasPage({super.key});
 
@@ -83,7 +81,7 @@ class _ContasPageState extends ConsumerState<ContasPage> {
           SectionHeader(titulo, count: lista.length),
           const Spacer(),
           if (total > 0)
-            Text(formatarReais(total), style: AppText.mono(size: 13, color: corTotal ?? AppColors.muted)),
+            Text(formatarReais(total), style: AppText.mono(size: 13, color: corTotal ?? context.cores.suave)),
         ],
       ),
     );
@@ -95,7 +93,7 @@ class _ContasPageState extends ConsumerState<ContasPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(rotulo, style: t.bodySmall?.copyWith(color: AppColors.muted)),
+          Text(rotulo, style: t.bodySmall?.copyWith(color: context.cores.suave)),
           const SizedBox(height: 2),
           FittedBox(
             fit: BoxFit.scaleDown,
@@ -145,29 +143,29 @@ class _ContasPageState extends ConsumerState<ContasPage> {
               alignment: Alignment.centerLeft,
               child: Text(
                 formatarReais(r.total),
-                style: AppText.mono(size: 32, color: venc > 0 ? _vermelho : AppColors.ink),
+                style: AppText.mono(size: 32, color: venc > 0 ? context.cores.perigo : context.cores.texto),
               ),
             ),
             const SizedBox(height: 4),
-            Text(legenda, style: t.bodySmall?.copyWith(color: AppColors.muted)),
+            Text(legenda, style: t.bodySmall?.copyWith(color: context.cores.suave)),
             if (!r.temValor && qtd > 0) ...[
               const SizedBox(height: 8),
               Text(
                 'Toque em uma conta e informe o valor para ver o total.',
-                style: t.bodySmall?.copyWith(color: AppColors.muted),
+                style: t.bodySmall?.copyWith(color: context.cores.suave),
               ),
             ],
             if (r.temValor) ...[
               const SizedBox(height: 14),
-              const Divider(height: 1, color: AppColors.cardBorder),
+              Divider(height: 1, color: context.cores.borda),
               const SizedBox(height: 12),
               Row(
                 children: [
-                  _mini('Vencidas', r.totalVencidas, r.totalVencidas > 0 ? _vermelho : AppColors.ink),
+                  _mini('Vencidas', r.totalVencidas, r.totalVencidas > 0 ? context.cores.perigo : context.cores.texto),
                   const SizedBox(width: 12),
-                  _mini('Próximos 7 dias', r.totalProximas, AppColors.ink),
+                  _mini('Próximos 7 dias', r.totalProximas, context.cores.texto),
                   const SizedBox(width: 12),
-                  _mini('Depois', r.totalDepois, AppColors.ink),
+                  _mini('Depois', r.totalDepois, context.cores.texto),
                 ],
               ),
             ],
@@ -185,12 +183,12 @@ class _ContasPageState extends ConsumerState<ContasPage> {
           onSelected: (_) => aoTocar(),
           showCheckmark: false,
           shape: const StadiumBorder(),
-          backgroundColor: Colors.white,
-          selectedColor: AppColors.brand.withValues(alpha: 0.14),
-          side: BorderSide(color: selecionado ? AppColors.brand : AppColors.cardBorder),
+          backgroundColor: context.cores.cartao,
+          selectedColor: context.cores.marca.withValues(alpha: 0.14),
+          side: BorderSide(color: selecionado ? context.cores.marca : context.cores.borda),
           labelStyle: TextStyle(
             fontWeight: FontWeight.w600,
-            color: selecionado ? AppColors.brand : AppColors.ink,
+            color: selecionado ? context.cores.marca : context.cores.texto,
           ),
         ),
       );
@@ -213,7 +211,7 @@ class _ContasPageState extends ConsumerState<ContasPage> {
                 ? 'Escolha outro tipo ou toque em “Todas”.'
                 : 'Toque em “Nova conta” ou diga, por exemplo:\n“Conta de luz de 150 reais dia 10”.',
             textAlign: TextAlign.center,
-            style: t.bodyMedium?.copyWith(color: AppColors.muted),
+            style: t.bodyMedium?.copyWith(color: context.cores.suave),
           ),
         ],
       ),
@@ -254,7 +252,7 @@ class _ContasPageState extends ConsumerState<ContasPage> {
           ),
         if (r.quantidade == 0) _vazio(filtro != null),
         if (r.vencidas.isNotEmpty) ...[
-          _secao('Vencidas', r.vencidas, corTotal: _vermelho),
+          _secao('Vencidas', r.vencidas, corTotal: context.cores.perigo),
           ...r.vencidas.map(_tile),
         ],
         if (r.proximas.isNotEmpty) ...[
