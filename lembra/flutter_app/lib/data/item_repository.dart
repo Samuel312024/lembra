@@ -16,7 +16,7 @@ class ItemRepository {
   Future<Database> _abrir() async {
     return openDatabase(
       p.join(await getDatabasesPath(), 'lembra.db'),
-      version: 3,
+      version: 4,
       onCreate: (db, versao) async {
         await db.execute('''
           CREATE TABLE itens (
@@ -38,11 +38,12 @@ class ItemRepository {
             criado_em INTEGER NOT NULL,
             atualizado_em INTEGER NOT NULL,
             dirty INTEGER NOT NULL DEFAULT 1,
-            som_alarme_id TEXT
+            som_alarme_id TEXT,
+            links TEXT
           )
         ''');
       },
-      // v2: valor e tipo das contas. v3: som próprio do alarme.
+      // v2: valor e tipo das contas. v3: som próprio do alarme. v4: links.
       // Quem já tem o app instalado só ganha as colunas, sem perder lembretes.
       onUpgrade: (db, antiga, nova) async {
         if (antiga < 2) {
@@ -51,6 +52,9 @@ class ItemRepository {
         }
         if (antiga < 3) {
           await db.execute('ALTER TABLE itens ADD COLUMN som_alarme_id TEXT');
+        }
+        if (antiga < 4) {
+          await db.execute('ALTER TABLE itens ADD COLUMN links TEXT');
         }
       },
     );

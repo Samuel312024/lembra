@@ -58,14 +58,17 @@ Widget _etiqueta(String texto, Color cor) => Container(
       child: Text(texto, style: TextStyle(color: cor, fontSize: 12, fontWeight: FontWeight.w700)),
     );
 
-Widget _info(IconData icone, String texto) => Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icone, size: 16, color: AppColors.muted),
-        const SizedBox(width: 6),
-        Flexible(child: Text(texto, style: const TextStyle(color: AppColors.muted, fontSize: 13))),
-      ],
-    );
+Widget _info(BuildContext context, IconData icone, String texto) {
+  final c = context.cores;
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icone, size: 16, color: c.suave),
+      const SizedBox(width: 6),
+      Flexible(child: Text(texto, style: TextStyle(color: c.suave, fontSize: 13))),
+    ],
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Aba "Reuniões"
@@ -132,7 +135,7 @@ class _ReunioesPageState extends ConsumerState<ReunioesPage> with WidgetsBinding
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: AppColors.cream,
+      backgroundColor: context.cores.fundo,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
       builder: (_) => _FolhaNovaReuniao(servico: svc, calendarios: calendarios),
     );
@@ -148,6 +151,7 @@ class _ReunioesPageState extends ConsumerState<ReunioesPage> with WidgetsBinding
     required VoidCallback aoTocar,
   }) {
     final t = Theme.of(context).textTheme;
+    final c = context.cores;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -162,7 +166,7 @@ class _ReunioesPageState extends ConsumerState<ReunioesPage> with WidgetsBinding
             const SizedBox(height: 8),
             Text(texto,
                 textAlign: TextAlign.center,
-                style: t.bodyMedium?.copyWith(color: AppColors.muted)),
+                style: t.bodyMedium?.copyWith(color: c.suave)),
             const SizedBox(height: 20),
             FilledButton(
               onPressed: aoTocar,
@@ -217,7 +221,7 @@ class _ReunioesPageState extends ConsumerState<ReunioesPage> with WidgetsBinding
               child: Text(
                 'Nenhuma reunião nos próximos 30 dias.\nPuxe para baixo para atualizar.',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: context.cores.suave),
               ),
             ),
           for (final e in porDia.entries) ...[
@@ -296,6 +300,7 @@ class _CartaoReuniao extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
+    final c = context.cores;
     final r = reuniao;
     final hm = DateFormat.Hm('pt_BR');
     final encerrada = DateTime.now().isAfter(r.fim);
@@ -309,10 +314,10 @@ class _CartaoReuniao extends StatelessWidget {
         margin: const EdgeInsets.fromLTRB(16, 6, 16, 6),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: c.cartao,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: r.emAndamento ? AppColors.brand : AppColors.cardBorder,
+            color: r.emAndamento ? c.marca : c.borda,
             width: r.emAndamento ? 1.5 : 1,
           ),
         ),
@@ -321,17 +326,17 @@ class _CartaoReuniao extends StatelessWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.schedule_rounded, size: 16, color: AppColors.muted),
+                Icon(Icons.schedule_rounded, size: 16, color: c.suave),
                 const SizedBox(width: 6),
                 Text(horario,
-                    style: t.labelLarge?.copyWith(color: AppColors.muted, fontWeight: FontWeight.w600)),
+                    style: t.labelLarge?.copyWith(color: c.suave, fontWeight: FontWeight.w600)),
                 if (r.emAndamento) ...[
                   const SizedBox(width: 8),
-                  _etiqueta('Em andamento', AppColors.brand),
+                  _etiqueta('Em andamento', c.marca),
                 ],
                 if (encerrada) ...[
                   const SizedBox(width: 8),
-                  _etiqueta('Encerrada', AppColors.muted),
+                  _etiqueta('Encerrada', c.suave),
                 ],
               ],
             ),
@@ -340,7 +345,7 @@ class _CartaoReuniao extends StatelessWidget {
               r.titulo,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: AppColors.ink),
+              style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: c.texto),
             ),
             const SizedBox(height: 10),
             Wrap(
@@ -348,11 +353,11 @@ class _CartaoReuniao extends StatelessWidget {
               runSpacing: 6,
               children: [
                 if (r.link != null)
-                  _info(Icons.videocam_rounded, r.link!.plataforma.nome)
+                  _info(context, Icons.videocam_rounded, r.link!.plataforma.nome)
                 else if (local.isNotEmpty)
-                  _info(Icons.place_outlined, local),
-                if (n > 0) _info(Icons.group_outlined, n == 1 ? '1 participante' : '$n participantes'),
-                if (r.calendarioNome.isNotEmpty) _info(Icons.event_outlined, r.calendarioNome),
+                  _info(context, Icons.place_outlined, local),
+                if (n > 0) _info(context, Icons.group_outlined, n == 1 ? '1 participante' : '$n participantes'),
+                if (r.calendarioNome.isNotEmpty) _info(context, Icons.event_outlined, r.calendarioNome),
               ],
             ),
             if (r.link != null && !encerrada) ...[
@@ -435,17 +440,39 @@ class _FolhaNovaReuniaoState extends State<_FolhaNovaReuniao> {
 
   DateTime get _inicio => DateTime(_data.year, _data.month, _data.day, _hora.hour, _hora.minute);
 
-  InputDecoration _decoracao(String rotulo, {String? ajuda}) => InputDecoration(
-        labelText: rotulo,
-        helperText: ajuda,
-        helperMaxLines: 2,
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: AppColors.cardBorder),
-        ),
-      );
+  InputDecoration _decoracao(String rotulo, {String? ajuda}) {
+    final c = context.cores;
+    return InputDecoration(
+      labelText: rotulo,
+      helperText: ajuda,
+      helperMaxLines: 2,
+      filled: true,
+      fillColor: c.cartao,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: c.borda),
+      ),
+    );
+  }
+
+  /// Chip de escolha (duração e calendário), no mesmo estilo dos filtros da home.
+  Widget _opcao(String rotulo, bool selecionado, VoidCallback aoTocar) {
+    final c = context.cores;
+    return ChoiceChip(
+      label: Text(rotulo),
+      selected: selecionado,
+      showCheckmark: false,
+      onSelected: (_) => aoTocar(),
+      shape: const StadiumBorder(),
+      backgroundColor: c.cartao,
+      selectedColor: c.marca.withValues(alpha: 0.18),
+      side: BorderSide(color: selecionado ? c.marca : c.borda),
+      labelStyle: TextStyle(
+        fontWeight: FontWeight.w600,
+        color: selecionado ? c.marca : c.texto,
+      ),
+    );
+  }
 
   Future<void> _escolherData() async {
     final hoje = DateTime.now();
@@ -538,6 +565,7 @@ class _FolhaNovaReuniaoState extends State<_FolhaNovaReuniao> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
+    final cores = context.cores;
     final dataTxt = toBeginningOfSentenceCase(DateFormat("EEE, d 'de' MMM", 'pt_BR').format(_data)) ?? '';
 
     return Padding(
@@ -549,7 +577,7 @@ class _FolhaNovaReuniaoState extends State<_FolhaNovaReuniao> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text('Agendar reunião',
-                  style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: AppColors.ink)),
+                  style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: cores.texto)),
               const SizedBox(height: 16),
               TextField(
                 controller: _titulo,
@@ -585,20 +613,14 @@ class _FolhaNovaReuniaoState extends State<_FolhaNovaReuniao> {
                 ],
               ),
               const SizedBox(height: 12),
-              Text('Duração', style: t.labelMedium?.copyWith(color: AppColors.muted)),
+              Text('Duração', style: t.labelMedium?.copyWith(color: cores.suave)),
               const SizedBox(height: 6),
               Wrap(
                 spacing: 8,
                 runSpacing: 4,
                 children: [
                   for (final e in _duracoes.entries)
-                    ChoiceChip(
-                      label: Text(e.value),
-                      selected: _duracaoMin == e.key,
-                      showCheckmark: false,
-                      onSelected: (_) => setState(() => _duracaoMin = e.key),
-                      selectedColor: AppColors.brand.withValues(alpha: 0.14),
-                    ),
+                    _opcao(e.value, _duracaoMin == e.key, () => setState(() => _duracaoMin = e.key)),
                 ],
               ),
               const SizedBox(height: 12),
@@ -618,26 +640,24 @@ class _FolhaNovaReuniaoState extends State<_FolhaNovaReuniao> {
               ),
               if (widget.calendarios.length > 1) ...[
                 const SizedBox(height: 12),
-                Text('Salvar no calendário', style: t.labelMedium?.copyWith(color: AppColors.muted)),
+                Text('Salvar no calendário', style: t.labelMedium?.copyWith(color: cores.suave)),
                 const SizedBox(height: 6),
                 Wrap(
                   spacing: 8,
                   runSpacing: 4,
                   children: [
-                    for (final c in widget.calendarios)
-                      ChoiceChip(
-                        label: Text(_nomeCalendario(c)),
-                        selected: identical(c, _calendario),
-                        showCheckmark: false,
-                        onSelected: (_) => setState(() => _calendario = c),
-                        selectedColor: AppColors.brand.withValues(alpha: 0.14),
+                    for (final cal in widget.calendarios)
+                      _opcao(
+                        _nomeCalendario(cal),
+                        identical(cal, _calendario),
+                        () => setState(() => _calendario = cal),
                       ),
                   ],
                 ),
               ],
               if (_erro != null) ...[
                 const SizedBox(height: 12),
-                Text(_erro!, style: t.bodyMedium?.copyWith(color: AppColors.red)),
+                Text(_erro!, style: t.bodyMedium?.copyWith(color: cores.perigo)),
               ],
               const SizedBox(height: 20),
               FilledButton(

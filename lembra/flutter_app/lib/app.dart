@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'services/alarme_nativo.dart';
 import 'services/notification_service.dart';
+import 'state/providers.dart';
 import 'ui/alarm_page.dart';
 import 'ui/boas_vindas_page.dart';
 import 'ui/theme/app_theme.dart';
@@ -17,15 +19,20 @@ const corCritico = Color(0xFFD97706);
 /// true = mostra a tela nova de exemplo; false = volta pra HomePage original.
 const bool _verPreview = false;
 
-class LembraApp extends StatefulWidget {
+// ConsumerStatefulWidget (em vez de StatefulWidget) para poder ler o temaProvider.
+class LembraApp extends ConsumerStatefulWidget {
   const LembraApp({super.key});
 
   @override
-  State<LembraApp> createState() => _LembraAppState();
+  ConsumerState<LembraApp> createState() => _LembraAppState();
 }
 
-class _LembraAppState extends State<LembraApp> {
+class _LembraAppState extends ConsumerState<LembraApp> {
   String? _alarmeAberto;
+
+  // Temas montados uma vez só, não a cada rebuild.
+  final ThemeData _temaClaro = buildAppTheme();
+  final ThemeData _temaEscuro = buildDarkTheme();
 
   @override
   void initState() {
@@ -73,12 +80,16 @@ class _LembraAppState extends State<LembraApp> {
 
   @override
   Widget build(BuildContext context) {
+    // Escolha feita em Ajustes > Aparência (Sistema / Claro / Escuro).
+    final tema = ref.watch(temaProvider);
+
     return MaterialApp(
       title: 'Lembra',
       debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey,
-      theme: buildAppTheme(),
-      themeMode: ThemeMode.light,
+      theme: _temaClaro,
+      darkTheme: _temaEscuro,
+      themeMode: tema,
       locale: const Locale('pt', 'BR'),
       supportedLocales: const [Locale('pt', 'BR')],
       localizationsDelegates: const [

@@ -219,7 +219,7 @@ class _CartaoState extends State<_Cartao> {
             TextField(
               controller: _titulo,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(labelText: 'O quê', border: OutlineInputBorder()),
+              decoration: const InputDecoration(labelText: 'Seu texto aqui', border: OutlineInputBorder()),
             ),
             const SizedBox(height: 8),
             _linha(Icons.event_outlined, _textoQuando(), acao: _alterarQuando),

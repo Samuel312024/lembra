@@ -159,6 +159,22 @@ class ItemTile extends StatelessWidget {
                                 fontWeight: atrasado ? FontWeight.w600 : null,
                               ),
                             ),
+                            // Indicador de links anexados (os links ficam no modal de detalhes).
+                            if (item.links.isNotEmpty)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.link_rounded, size: 15, color: context.cores.marca),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    '${item.links.length}',
+                                    style: t.bodySmall?.copyWith(
+                                      color: context.cores.marca,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
                           ],
                         ),
                       ],

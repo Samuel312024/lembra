@@ -5,9 +5,11 @@ import '../domain/categoria_conta.dart';
 import '../domain/dinheiro.dart';
 import '../domain/draft.dart';
 import '../domain/item.dart';
+import '../../domain/utils/normalizar_link.dart';
 import '../domain/recorrencia.dart';
 import 'agenda.dart';
 import 'item_tile.dart' show iconeDaCategoria;
+import 'theme/app_theme.dart';
 import 'widgets/seletor_som_alarme.dart';
 
 enum _Rep { nenhuma, diaria, uteis, semanal, mensal }
@@ -30,6 +32,8 @@ class _ItemFormPageState extends State<ItemFormPage> {
   late final TextEditingController _valor = TextEditingController(
     text: d.valor == null ? '' : d.valor!.toStringAsFixed(2).replaceAll('.', ','),
   );
+  final TextEditingController _linkCampo = TextEditingController();
+  String? _erroLink;
   late _Rep _rep;
   late Set<int> _dias;
 
@@ -66,6 +70,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
   void dispose() {
     _titulo.dispose();
     _valor.dispose();
+    _linkCampo.dispose();
     super.dispose();
   }
 
@@ -115,8 +120,34 @@ class _ItemFormPageState extends State<ItemFormPage> {
     });
   }
 
+  /// Adiciona o que está digitado no campo de link. Aceita vários links colados
+  /// de uma vez (separados por espaço ou linha). Devolve false se algum for inválido.
+  bool _adicionarLink() {
+    final bruto = _linkCampo.text.trim();
+    if (bruto.isEmpty) return true;
+    final novos = <String>[];
+    for (final parte in bruto.split(RegExp(r'\s+'))) {
+      final url = normalizarLink(parte);
+      if (url == null) {
+        setState(() => _erroLink = 'Link inválido: $parte. Exemplo: https://site.com');
+        return false;
+      }
+      novos.add(url);
+    }
+    setState(() {
+      for (final u in novos) {
+        if (!d.links.contains(u)) d.links.add(u);
+      }
+      _linkCampo.clear();
+      _erroLink = null;
+    });
+    return true;
+  }
+
   void _salvar() {
     if (!_chave.currentState!.validate()) return;
+    // Se sobrou um link digitado e não adicionado, adiciona agora (ou avisa se for inválido).
+    if (!_adicionarLink()) return;
     d.titulo = _titulo.text.trim();
     // Som próprio só faz sentido em alarme crítico.
     if (d.urgencia != Urgencia.critico) d.somAlarmeId = null;
@@ -178,6 +209,71 @@ class _ItemFormPageState extends State<ItemFormPage> {
         ),
       ];
 
+  /// Links do item (todos os tipos): campo para colar o endereço + lista com botão de remover.
+  Widget _secaoLinks() {
+    final c = context.cores;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _linkCampo,
+          keyboardType: TextInputType.url,
+          textInputAction: TextInputAction.done,
+          autocorrect: false,
+          enableSuggestions: false,
+          onSubmitted: (_) => _adicionarLink(),
+          onChanged: (_) {
+            if (_erroLink != null) setState(() => _erroLink = null);
+          },
+          decoration: InputDecoration(
+            labelText: 'Link (opcional)',
+            hintText: 'Cole o endereço e toque em +',
+            errorText: _erroLink,
+            errorMaxLines: 2,
+            border: const OutlineInputBorder(),
+            suffixIcon: IconButton(
+              tooltip: 'Adicionar link',
+              icon: const Icon(Icons.add_link_rounded),
+              onPressed: _adicionarLink,
+            ),
+          ),
+        ),
+        for (final url in d.links)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Container(
+              padding: const EdgeInsets.only(left: 12),
+              decoration: BoxDecoration(
+                color: c.cartao,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: c.borda),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.link_rounded, size: 18, color: c.marca),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      url,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: c.texto),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Remover link',
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(Icons.close_rounded, size: 18, color: c.suave),
+                    onPressed: () => setState(() => d.links.remove(url)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final a = d.ancora;
@@ -208,10 +304,12 @@ class _ItemFormPageState extends State<ItemFormPage> {
             TextFormField(
               controller: _titulo,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(labelText: 'O quê', border: OutlineInputBorder()),
+              decoration: const InputDecoration(labelText: 'Seu texto aqui', border: OutlineInputBorder()),
               validator: (v) => (v == null || v.trim().isEmpty) ? 'Dê um nome ao lembrete' : null,
             ),
             if (d.tipo == TipoItem.conta) ..._camposConta(),
+            const SizedBox(height: 16),
+            _secaoLinks(),
             const SizedBox(height: 16),
             Row(
               children: [

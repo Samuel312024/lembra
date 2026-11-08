@@ -38,6 +38,19 @@ T _enumPor<T extends Enum>(List<T> valores, Object? nome, T padrao) {
 DateTime? _dt(Object? v) =>
     v == null ? null : DateTime.fromMillisecondsSinceEpoch((v as num).toInt());
 
+/// Lê a lista de links vinda do SQLite (texto JSON) ou da API (lista).
+/// Qualquer coisa inesperada vira lista vazia, para nunca quebrar a abertura do app.
+List<String> _lerLinks(Object? v) {
+  if (v == null) return [];
+  try {
+    final bruto = v is String ? (v.isEmpty ? const [] : jsonDecode(v)) : v;
+    if (bruto is! List) return [];
+    return bruto.map((e) => '$e'.trim()).where((e) => e.isNotEmpty).toList();
+  } catch (_) {
+    return [];
+  }
+}
+
 /// Item da agenda (compromisso, tarefa, hábito ou conta). Mutável de propósito:
 /// o estado exibido é sempre recarregado do banco após cada operação.
 class Item {
@@ -61,7 +74,9 @@ class Item {
     required this.atualizadoEm,
     this.dirty = true,
     this.somAlarmeId,
-  }) : antecedencias = antecedencias ?? [];
+    List<String>? links,
+  })  : antecedencias = antecedencias ?? [],
+        links = links ?? [];
 
   String id;
   TipoItem tipo;
@@ -85,6 +100,9 @@ class Item {
   /// Som próprio do alarme deste lembrete (id de um SomAlarme).
   /// null = usa o som padrão escolhido em Ajustes > Som do alarme.
   String? somAlarmeId;
+
+  /// Links anexados ao item (endereços completos, como https://site.com/pagina).
+  List<String> links;
 
   /// Tarefas e contas usam "prazo"; compromissos e hábitos usam "início".
   bool get usaPrazo => tipo == TipoItem.tarefa || tipo == TipoItem.conta;
@@ -123,19 +141,22 @@ class Item {
         atualizadoEm: atualizadoEm,
         dirty: dirty,
         somAlarmeId: somAlarmeId,
+        links: List.of(links),
       );
 
   /// Mapa para o SQLite local (e para o backup).
-  /// A coluna som_alarme_id só entra quando o lembrete tem som próprio, para
-  /// não quebrar bancos que ainda não ganharam essa coluna.
+  /// As colunas som_alarme_id e links só entram quando têm conteúdo, para não
+  /// quebrar bancos que ainda não ganharam essas colunas.
   Map<String, Object?> toMap() => {
         ...toJson(),
         'antecedencias': jsonEncode(antecedencias),
         'dirty': dirty ? 1 : 0,
         if (somAlarmeId != null) 'som_alarme_id': somAlarmeId,
+        if (links.isNotEmpty) 'links': jsonEncode(links),
       };
 
   /// JSON da API de sincronização (datas em milissegundos UTC).
+  /// O campo links só vai quando o item tem links.
   Map<String, Object?> toJson() => {
         'id': id,
         'tipo': tipo.name,
@@ -154,6 +175,7 @@ class Item {
         'concluido_em': concluidoEm?.millisecondsSinceEpoch,
         'criado_em': criadoEm.millisecondsSinceEpoch,
         'atualizado_em': atualizadoEm.millisecondsSinceEpoch,
+        if (links.isNotEmpty) 'links': links,
       };
 
   factory Item.fromMap(Map<String, Object?> m) {
@@ -179,6 +201,7 @@ class Item {
       atualizadoEm: _dt(m['atualizado_em'])!,
       dirty: (m['dirty'] as num?)?.toInt() == 1,
       somAlarmeId: m['som_alarme_id'] as String?,
+      links: _lerLinks(m['links']),
     );
   }
 }

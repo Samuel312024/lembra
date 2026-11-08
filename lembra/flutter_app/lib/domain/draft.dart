@@ -29,8 +29,10 @@ class Draft {
     this.valor,
     this.categoria,
     this.somAlarmeId,
+    List<String>? links,
   })  : antecedencias = antecedencias ?? antecedenciasPadrao(tipo),
-        camposFaltando = camposFaltando ?? [];
+        camposFaltando = camposFaltando ?? [],
+        links = links ?? [];
 
   TipoItem tipo;
   String titulo;
@@ -51,6 +53,9 @@ class Draft {
 
   /// Som próprio do alarme (id de um SomAlarme). null = padrão de Ajustes.
   String? somAlarmeId;
+
+  /// Links anexados (endereços completos). Valem para todos os tipos de item.
+  List<String> links;
 
   /// Antecedências padrão por tipo (spec 4.4).
   static List<int> antecedenciasPadrao(TipoItem t) {
@@ -81,6 +86,7 @@ class Draft {
         valor: i.valor,
         categoria: i.categoria,
         somAlarmeId: i.somAlarmeId,
+        links: List.of(i.links),
       );
 
   bool get usaPrazo => tipo == TipoItem.tarefa || tipo == TipoItem.conta;
@@ -123,6 +129,7 @@ class Draft {
       valor: tipo == TipoItem.conta ? valor : null,
       categoria: tipo == TipoItem.conta ? categoria : null,
       somAlarmeId: urgencia == Urgencia.critico ? somAlarmeId : null,
+      links: List.of(links),
       criadoEm: t,
       atualizadoEm: t,
     );
@@ -144,6 +151,8 @@ class Draft {
     i.categoria = tipo == TipoItem.conta ? categoria : null;
     // Som próprio só existe em alarme crítico.
     i.somAlarmeId = urgencia == Urgencia.critico ? somAlarmeId : null;
+    // Links valem para qualquer tipo de item.
+    i.links = List.of(links);
     i.soneca = 0;
     i.atualizadoEm = DateTime.now();
     i.dirty = true;

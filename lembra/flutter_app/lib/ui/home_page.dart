@@ -157,7 +157,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: AppColors.cream,
+      backgroundColor: context.cores.fundo,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
       builder: (ctx) => _detalhesItem(ctx, item, feito),
     );
@@ -166,20 +166,21 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
   /// Uma linha do modal: ícone, rótulo pequeno e o texto inteiro (selecionável).
   Widget _linhaDetalhe(BuildContext ctx, IconData icone, String rotulo, String texto) {
     final t = Theme.of(ctx).textTheme;
+    final c = ctx.cores;
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icone, size: 20, color: AppColors.muted),
+          Icon(icone, size: 20, color: c.suave),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(rotulo, style: t.labelMedium?.copyWith(color: AppColors.muted)),
+                Text(rotulo, style: t.labelMedium?.copyWith(color: c.suave)),
                 const SizedBox(height: 2),
-                SelectableText(texto, style: t.bodyLarge?.copyWith(color: AppColors.ink)),
+                SelectableText(texto, style: t.bodyLarge?.copyWith(color: c.texto)),
               ],
             ),
           ),
@@ -190,6 +191,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
 
   Widget _detalhesItem(BuildContext ctx, Item item, bool feito) {
     final t = Theme.of(ctx).textTheme;
+    final c = ctx.cores;
     String maiuscula(String s) => toBeginningOfSentenceCase(s) ?? s;
 
     final a = item.ancora;
@@ -222,7 +224,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
               Text(
                 item.tipo.rotulo.toUpperCase(),
                 style: t.labelLarge?.copyWith(
-                  color: AppColors.brand,
+                  color: c.marca,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1.2,
                 ),
@@ -230,7 +232,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
               const SizedBox(height: 6),
               SelectableText(
                 item.titulo,
-                style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: AppColors.ink),
+                style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: c.texto),
               ),
               _linhaDetalhe(ctx, Icons.event_rounded, 'Quando', quando),
               if (repete != null && repete.isNotEmpty)
@@ -282,7 +284,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
                       label: const Text('Cancelar'),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(48),
-                        foregroundColor: AppColors.red,
+                        foregroundColor: c.perigo,
                         shape: const StadiumBorder(),
                       ),
                     ),
@@ -323,30 +325,33 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
   /// Chip de filtro. O nome nunca é cortado dentro do chip: sem quebra de
   /// linha e sem reticências. Se a faixa não couber na tela, quem rola para o
   /// lado é a faixa (veja o build), não o texto.
-  Widget _chip(String rotulo, bool selecionado, VoidCallback aoTocar) => Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: ChoiceChip(
-          label: Text(
-            rotulo,
-            maxLines: 1,
-            softWrap: false,
-            overflow: TextOverflow.visible,
-          ),
-          selected: selecionado,
-          onSelected: (_) => aoTocar(),
-          showCheckmark: false,
-          visualDensity: VisualDensity.compact,
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          shape: const StadiumBorder(),
-          backgroundColor: Colors.white,
-          selectedColor: AppColors.brand.withValues(alpha: 0.14),
-          side: BorderSide(color: selecionado ? AppColors.brand : AppColors.cardBorder),
-          labelStyle: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: selecionado ? AppColors.brand : AppColors.ink,
-          ),
+  Widget _chip(String rotulo, bool selecionado, VoidCallback aoTocar) {
+    final c = context.cores;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(
+          rotulo,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.visible,
         ),
-      );
+        selected: selecionado,
+        onSelected: (_) => aoTocar(),
+        showCheckmark: false,
+        visualDensity: VisualDensity.compact,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        shape: const StadiumBorder(),
+        backgroundColor: c.cartao,
+        selectedColor: c.marca.withValues(alpha: 0.18),
+        side: BorderSide(color: selecionado ? c.marca : c.borda),
+        labelStyle: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: selecionado ? c.marca : c.texto,
+        ),
+      ),
+    );
+  }
 
   Widget _secao(String titulo, int quantidade) => Padding(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
@@ -369,7 +374,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
               Text(
                 'Toque em “Falar agora” e diga, por exemplo:\n“Tenho médico dia 22 às 14h30”.',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: context.cores.suave),
               ),
             ],
           ),
@@ -381,7 +386,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
         child: Center(
           child: Text(
             'Nenhum item deste tipo hoje.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.muted),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: context.cores.suave),
           ),
         ),
       );
@@ -454,7 +459,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      backgroundColor: AppColors.cream,
+      backgroundColor: context.cores.fundo,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
       builder: (ctx) => Consumer(
         builder: (ctx, r, _) {
@@ -463,6 +468,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
           final atrasados = agruparHoje(lista, agora).atrasados;
           final criticos = _criticosProximos(lista, agora);
           final t = Theme.of(ctx).textTheme;
+          final c = ctx.cores;
 
           Widget tile(Item i) => ItemTile(
                 key: ValueKey('atencao-${i.id}'),
@@ -500,7 +506,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
                         Text(
                           'Nada atrasado e nenhum alarme crítico nas próximas 24 horas.',
                           textAlign: TextAlign.center,
-                          style: t.bodyMedium?.copyWith(color: AppColors.muted),
+                          style: t.bodyMedium?.copyWith(color: c.suave),
                         ),
                       ],
                     ),
@@ -549,12 +555,13 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
       ].join(' • ');
     }
 
+    final c = context.cores;
     return StatCard(
       icon: Icons.account_balance_wallet_rounded,
       iconColor: AppColors.yellow,
       label: 'Contas a vencer',
       value: valor,
-      valueColor: venc > 0 ? const Color(0xFFDC2626) : AppColors.cyanDeep,
+      valueColor: venc > 0 ? c.perigo : c.ciano,
       caption: legenda,
       onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ContasPage())),
     );
@@ -590,7 +597,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
                     iconColor: AppColors.orange,
                     label: proximo?.titulo ?? 'Próximo alarme',
                     value: quando == null ? '--:--' : DateFormat.Hm('pt_BR').format(quando),
-                    valueColor: AppColors.brand,
+                    valueColor: context.cores.marca,
                     caption: quando == null
                         ? 'Nenhum alarme à frente'
                         : 'Próximo alarme • ${quandoCurto(quando, comHora: false, agora: agora)}',
@@ -661,6 +668,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
     final itens = ref.watch(itemsProvider);
     final t = Theme.of(context).textTheme;
     final alerta = _temAlerta(itens.valueOrNull ?? const <Item>[]);
+    final c = context.cores;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -783,8 +791,8 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
                 heroTag: 'manual',
                 tooltip: 'Adicionar digitando',
                 onPressed: _novoManual,
-                backgroundColor: Colors.white,
-                foregroundColor: AppColors.brand,
+                backgroundColor: c.cartao,
+                foregroundColor: c.marca,
                 elevation: 1,
                 child: const Icon(Icons.edit_outlined),
               ),
