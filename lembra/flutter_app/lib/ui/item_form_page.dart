@@ -5,11 +5,12 @@ import '../domain/categoria_conta.dart';
 import '../domain/dinheiro.dart';
 import '../domain/draft.dart';
 import '../domain/item.dart';
-import '../../domain/utils/normalizar_link.dart';
 import '../domain/recorrencia.dart';
+import '../domain/utils/normalizar_link.dart';
 import 'agenda.dart';
 import 'item_tile.dart' show iconeDaCategoria;
 import 'theme/app_theme.dart';
+import 'widgets/link_linha.dart' show abrirLink;
 import 'widgets/seletor_som_alarme.dart';
 
 enum _Rep { nenhuma, diaria, uteis, semanal, mensal }
@@ -210,6 +211,7 @@ class _ItemFormPageState extends State<ItemFormPage> {
       ];
 
   /// Links do item (todos os tipos): campo para colar o endereço + lista com botão de remover.
+  /// Tocar no endereço da lista abre o link; o X remove.
   Widget _secaoLinks() {
     final c = context.cores;
     return Column(
@@ -253,11 +255,22 @@ class _ItemFormPageState extends State<ItemFormPage> {
                   Icon(Icons.link_rounded, size: 18, color: c.marca),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      url,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: c.texto),
+                    child: InkWell(
+                      onTap: () => abrirLink(context, url),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          url,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: c.marca,
+                            decoration: TextDecoration.underline,
+                            decorationColor: c.marca,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                   IconButton(

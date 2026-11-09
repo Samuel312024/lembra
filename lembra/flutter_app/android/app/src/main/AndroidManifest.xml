@@ -28,19 +28,10 @@
 
     <!-- Reagenda os lembretes depois que o celular reinicia. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-    <uses-permission android:name="android.permission.VIBRATE"/>
-    <uses-permission android:name="android.permission.WAKE_LOCK"/>  
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
-    <uses-permission android:name="android.permission.WAKE_LOCK"/>
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+
+    <!-- Agenda do celular. -->
     <uses-permission android:name="android.permission.READ_CALENDAR"/>
     <uses-permission android:name="android.permission.WRITE_CALENDAR"/>
-    <queries>
-    <intent>
-        <action android:name="android.intent.action.VIEW"/>
-        <data android:scheme="https"/>
-    </intent>
-    </queries>
 
     <application
         android:label="lembra"
@@ -59,7 +50,7 @@
             android:windowSoftInputMode="adjustResize"
             android:showWhenLocked="true"
             android:turnScreenOn="true">
-            
+
             <!-- Specifies an Android theme to apply to this Activity as soon as
                  the Android process has started. This theme is visible to the user
                  while the Flutter UI initializes. After that, this theme continues
@@ -129,17 +120,27 @@
             android:value="2" />
     </application>
 
-    <!-- Required to query activities that can process text, see:
-         https://developer.android.com/training/package-visibility and
-         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
-
-         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <!-- Android 11+ exige declarar o que o app consulta, see:
+         https://developer.android.com/training/package-visibility -->
     <queries>
+        <!-- Abrir links (http e https) no navegador ou em apps como YouTube e Meet. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="http"/>
+        </intent>
+
+        <!-- Usado pela engine do Flutter em io.flutter.plugin.text.ProcessTextPlugin.
+             https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT -->
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
-        <!-- Reconhecimento de voz (Android 11+ exige declarar). -->
+
+        <!-- Reconhecimento de voz. -->
         <intent>
             <action android:name="android.speech.RecognitionService"/>
         </intent>

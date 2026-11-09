@@ -20,6 +20,7 @@ import 'review_page.dart';
 import 'settings_page.dart';
 import 'theme/app_theme.dart';
 import 'voice_flow.dart';
+import 'widgets/link_linha.dart';
 import 'widgets/ui_kit.dart';
 import '../services/compartilhar_app.dart';
 
@@ -189,6 +190,36 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
     );
   }
 
+  /// Links do item no modal: tocar no endereço abre no navegador (ou no app que
+  /// reconhece o link); o botão à direita copia.
+  Widget _linhaLinks(BuildContext ctx, List<String> links) {
+    final t = Theme.of(ctx).textTheme;
+    final c = ctx.cores;
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.link_rounded, size: 20, color: c.suave),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(links.length == 1 ? 'Link' : 'Links', style: t.labelMedium?.copyWith(color: c.suave)),
+                for (final url in links)
+                  LinkLinha(
+                    url: url,
+                    aoAbrir: () => abrirLink(ctx, url),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _detalhesItem(BuildContext ctx, Item item, bool feito) {
     final t = Theme.of(ctx).textTheme;
     final c = ctx.cores;
@@ -240,6 +271,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
               if (mostrarValor)
                 _linhaDetalhe(ctx, Icons.account_balance_wallet_rounded, 'Valor', formatarReais(item.valor!)),
               _linhaDetalhe(ctx, Icons.notifications_active_outlined, 'Aviso', urgencia),
+              if (item.links.isNotEmpty) _linhaLinks(ctx, item.links),
               const SizedBox(height: 24),
               FilledButton.icon(
                 onPressed: () {

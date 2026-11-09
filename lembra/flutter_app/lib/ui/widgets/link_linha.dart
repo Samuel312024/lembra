@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lembra/domain/utils/normalizar_link.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../theme/app_theme.dart';
 
 /// Abre o link no navegador (ou no app que o reconhece, como YouTube ou Meet).
 Future<void> abrirLink(BuildContext context, String url) async {
-  final uri = Uri.tryParse(url);
+  final uri = Uri.tryParse(normalizarLink(url) ?? url);
   var abriu = false;
   if (uri != null) {
     try {
