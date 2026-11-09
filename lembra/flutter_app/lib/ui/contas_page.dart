@@ -2,6 +2,11 @@
 //
 // Lista das contas em aberto, com o total em reais e filtro por tipo de conta.
 // Abre ao tocar no card "Contas a vencer" da tela inicial.
+//
+// Novo: cartão "Contas do mês × renda" (CLT ou PJ) com margem vermelha e
+// opção de salvar o relatório em PDF ou imagem.
+
+import 'dart:io' show File;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,10 +15,16 @@ import '../domain/categoria_conta.dart';
 import '../domain/dinheiro.dart';
 import '../domain/draft.dart';
 import '../domain/item.dart';
+import '../domain/renda.dart';
+import '../services/relatorio_export.dart';
 import '../state/providers.dart';
+import '../state/renda_provider.dart';
+import 'comparativo_renda_card.dart';
 import 'conta_paga.dart';
 import 'item_form_page.dart';
 import 'item_tile.dart';
+import 'relatorios_salvos_sheet.dart';
+import 'renda_sheet.dart';
 import 'resumo_contas.dart';
 import 'resumo_mes_page.dart';
 import 'theme/app_theme.dart';
@@ -28,6 +39,22 @@ class ContasPage extends ConsumerStatefulWidget {
 
 class _ContasPageState extends ConsumerState<ContasPage> {
   CategoriaConta? _filtro;
+
+  /// Marca o cartão de renda para tirar o "print" (imagem).
+  final _capturaKey = GlobalKey();
+
+  // >>> AJUSTE AQUI: nome do campo de data/vencimento do Item (aqui: `quando`).
+  // É a única linha que depende de um campo que eu não vi no seu modelo.
+  DateTime? _dataDe(Item i) => i.ancora;
+
+  /// Contas em aberto que vencem até o fim do mês atual (inclui as já vencidas).
+  List<Item> _contasDoMes(Iterable<Item> abertas, DateTime agora) {
+    final fimDoMes = DateTime(agora.year, agora.month + 1, 1);
+    return [
+      for (final i in abertas)
+        if (_dataDe(i) case final d? when d.isBefore(fimDoMes)) i,
+    ];
+  }
 
   Future<void> _nova() async {
     final d = await Navigator.of(context).push<Draft>(
@@ -62,6 +89,31 @@ class _ContasPageState extends ConsumerState<ContasPage> {
       content: Text('“${item.titulo}” cancelada.'),
       action: antes == null ? null : SnackBarAction(label: 'Desfazer', onPressed: () => notifier.restaurar(antes)),
     ));
+  }
+
+  Future<void> _exportar(FormatoRelatorio formato, DadosRelatorio dados) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final File arquivo;
+      if (formato == FormatoRelatorio.pdf) {
+        arquivo = await RelatorioExport.salvarPdf(dados);
+      } else {
+        final png = await RelatorioExport.capturarPng(_capturaKey);
+        if (png == null) {
+          messenger.showSnackBar(
+            const SnackBar(content: Text('Role até o cartão de renda e tente de novo.')),
+          );
+          return;
+        }
+        arquivo = await RelatorioExport.salvarImagem(dados, png);
+      }
+      messenger.showSnackBar(SnackBar(
+        content: Text(formato == FormatoRelatorio.pdf ? 'PDF salvo em “Salvos”.' : 'Imagem salva em “Salvos”.'),
+        action: SnackBarAction(label: 'Compartilhar', onPressed: () => RelatorioExport.compartilhar(arquivo)),
+      ));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Não foi possível salvar: $e')));
+    }
   }
 
   ItemTile _tile(Item i) => ItemTile(
@@ -175,6 +227,74 @@ class _ContasPageState extends ConsumerState<ContasPage> {
     );
   }
 
+  Widget _acao(IconData icone, String rotulo, VoidCallback aoTocar) => ActionChip(
+        avatar: Icon(icone, size: 18, color: context.cores.marca),
+        label: Text(rotulo),
+        onPressed: aoTocar,
+        shape: const StadiumBorder(),
+        backgroundColor: context.cores.cartao,
+        side: BorderSide(color: context.cores.borda),
+        labelStyle: TextStyle(fontWeight: FontWeight.w600, color: context.cores.texto),
+      );
+
+  /// Cartão "Contas do mês × renda" + ações (editar renda, PDF, imagem, salvos).
+  Widget _comparativo(PerfilRenda? perfil, double gasto, List<Item> doMes, DateTime agora) {
+    final dados = (perfil == null || perfil.rendaMensal <= 0)
+        ? null
+        : DadosRelatorio(
+            mes: agora,
+            perfil: perfil,
+            gasto: gasto,
+            linhas: [
+              for (final i in doMes)
+                LinhaRelatorio(
+                  titulo: i.titulo,
+                  tipo: i.categoria?.rotulo,
+                  data: _dataDe(i),
+                  valor: ResumoContas.somaDe([i]),
+                ),
+            ],
+          );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Tudo que está dentro do RepaintBoundary vira a imagem salva.
+          RepaintBoundary(
+            key: _capturaKey,
+            child: ColoredBox(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: ComparativoRendaCard(perfil: perfil, gasto: gasto, mes: agora),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: Wrap(
+              spacing: 8,
+              children: [
+                _acao(
+                  Icons.tune_rounded,
+                  dados == null ? 'Informar renda' : 'Editar renda',
+                  () => abrirConfiguracaoRenda(context, ref),
+                ),
+                if (dados != null) ...[
+                  _acao(Icons.picture_as_pdf_outlined, 'Salvar PDF', () => _exportar(FormatoRelatorio.pdf, dados)),
+                  _acao(Icons.image_outlined, 'Salvar imagem', () => _exportar(FormatoRelatorio.imagem, dados)),
+                ],
+                _acao(Icons.folder_open_rounded, 'Salvos', () => abrirRelatoriosSalvos(context)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _chip(String rotulo, bool selecionado, VoidCallback aoTocar) => Padding(
         padding: const EdgeInsets.only(right: 8),
         child: ChoiceChip(
@@ -222,6 +342,12 @@ class _ContasPageState extends ConsumerState<ContasPage> {
     final agora = DateTime.now();
     final todas = ResumoContas.de(lista, agora);
 
+    // Comparativo com a renda: considera todas as contas do mês, sem filtro de tipo.
+    final rendaAsync = ref.watch(rendaProvider);
+    final perfil = rendaAsync.value;
+    final doMes = _contasDoMes(todas.abertas, agora);
+    final gastoMes = ResumoContas.somaDe(doMes);
+
     // Só oferece filtro para os tipos que existem entre as contas em aberto.
     final tipos = <CategoriaConta>{
       for (final i in todas.abertas)
@@ -237,6 +363,7 @@ class _ContasPageState extends ConsumerState<ContasPage> {
       padding: const EdgeInsets.only(bottom: 120),
       children: [
         _resumo(r),
+        if (!rendaAsync.isLoading) _comparativo(perfil, gastoMes, doMes, agora),
         if (tipos.isNotEmpty)
           SizedBox(
             height: 56,
