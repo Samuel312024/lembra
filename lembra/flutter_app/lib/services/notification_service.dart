@@ -326,6 +326,13 @@ class NotificationService {
     // Só o canal do alarme crítico tem esse prefixo; discreto e normal seguem como estavam.
     final nativo = detalhes.android?.channelId.startsWith(kCanalAlarmePrefixo) ?? false;
     if (alarme && nativo && AlarmeNativo.instance.disponivel) {
+      // O id do canal identifica o som escolhido para este item: o serviço
+      // nativo precisa receber o som, senão toca sempre o alarme padrão.
+      final canalId = detalhes.android?.channelId;
+      final somEscolhido = sonsAlarme.firstWhere(
+        (s) => canalAlarmeId(s) == canalId,
+        orElse: () => _somAlarme,
+      );
       await AlarmeNativo.instance.agendar(
         chave: 'a$id',
         itemId: payload,
@@ -342,6 +349,8 @@ class NotificationService {
         diaMes: quando.day,
         hora: quando.hour,
         minuto: quando.minute,
+        recurso: somEscolhido.recurso,
+        uri: somEscolhido.uri,
       );
       return;
     }

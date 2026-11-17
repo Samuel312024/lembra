@@ -45,6 +45,8 @@ data class AlarmeSlot(
     val diaMes: Int,   // MONTHLY
     val hora: Int,
     val minuto: Int,
+    val recurso: String? = null, // som do Lembra (res/raw), sem extensão
+    val uri: String? = null,     // som do próprio celular
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("chave", chave)
@@ -57,6 +59,8 @@ data class AlarmeSlot(
         put("diaMes", diaMes)
         put("hora", hora)
         put("minuto", minuto)
+        recurso?.let { put("recurso", it) }
+        uri?.let { put("uri", it) }
     }
 
     companion object {
@@ -71,6 +75,8 @@ data class AlarmeSlot(
             diaMes = o.getInt("diaMes"),
             hora = o.getInt("hora"),
             minuto = o.getInt("minuto"),
+            recurso = o.optString("recurso", "").ifEmpty { null },
+            uri = o.optString("uri", "").ifEmpty { null },
         )
     }
 }
@@ -229,6 +235,8 @@ class AlarmeReceiver : BroadcastReceiver() {
             .putExtra("itemId", slot.itemId)
             .putExtra("titulo", slot.titulo)
             .putExtra("corpo", slot.corpo)
+            .putExtra("recurso", slot.recurso)
+            .putExtra("uri", slot.uri)
         if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(i) else ctx.startService(i)
     }
 }
@@ -291,12 +299,14 @@ class AlarmeService : Service() {
         val itemId = intent?.getStringExtra("itemId") ?: ""
         val titulo = intent?.getStringExtra("titulo") ?: "Alarme"
         val corpo = intent?.getStringExtra("corpo") ?: ""
+        val recurso = intent?.getStringExtra("recurso")
+        val uri = intent?.getStringExtra("uri")
         atual = mapOf("itemId" to itemId, "titulo" to titulo, "corpo" to corpo)
 
         iniciarPrimeiroPlano(itemId, titulo, corpo)
         silenciar() // se já havia outro alarme tocando, recomeça limpo
         acordarTela()
-        tocarSom()
+        tocarSom(recurso, uri)
         vibrar()
         abrirTela(itemId, titulo, corpo)
         handler.postDelayed({ stopSelf() }, LIMITE_MS) // desiste após 10 min
@@ -360,7 +370,8 @@ class AlarmeService : Service() {
         }
     }
 
-    private fun tocarSom() {
+    /** Toca o som escolhido; se não der, cai para o alarme padrão do celular. */
+    private fun tocarSom(recurso: String?, uri: String?) {
         try {
             // Garante um volume de alarme audível (pelo menos 70% do máximo).
             val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -371,24 +382,22 @@ class AlarmeService : Service() {
             }
         } catch (_: Exception) {
         }
+
+        // 1) O som escolhido pelo usuário.
+        if (tocarEscolhido(recurso, uri)) return
+
+        // 2) Se falhar, cai para o alarme padrão do celular.
         val candidatos = listOfNotNull(
             RingtoneManager.getActualDefaultRingtoneUri(this, RingtoneManager.TYPE_ALARM),
             RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
             RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
             RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE),
         )
-        for (uri in candidatos) {
+        for (u in candidatos) {
             var p: MediaPlayer? = null
             try {
-                p = MediaPlayer()
-                p.setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build(),
-                )
-                p.setDataSource(this, uri)
-                p.isLooping = true
+                p = novoPlayer()
+                p.setDataSource(this, u)
                 p.prepare()
                 p.start()
                 player = p
@@ -399,6 +408,48 @@ class AlarmeService : Service() {
                 } catch (_: Exception) {
                 }
             }
+        }
+    }
+
+    private fun novoPlayer(): MediaPlayer = MediaPlayer().apply {
+        setAudioAttributes(
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build(),
+        )
+        isLooping = true
+    }
+
+    private fun tocarEscolhido(recurso: String?, uri: String?): Boolean {
+        var p: MediaPlayer? = null
+        try {
+            p = novoPlayer()
+            if (!recurso.isNullOrEmpty()) {
+                val resId = resources.getIdentifier(recurso, "raw", packageName)
+                if (resId == 0) {
+                    p.release()
+                    return false
+                }
+                val afd = resources.openRawResourceFd(resId)
+                p.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                afd.close()
+            } else if (!uri.isNullOrEmpty()) {
+                p.setDataSource(this, Uri.parse(uri))
+            } else {
+                p.release()
+                return false
+            }
+            p.prepare()
+            p.start()
+            player = p
+            return true
+        } catch (_: Exception) {
+            try {
+                p?.release()
+            } catch (_: Exception) {
+            }
+            return false
         }
     }
 

@@ -54,6 +54,8 @@ class AlarmeNativo {
   }
 
   /// [freq]: null (único) | 'DAILY' | 'WEEKLY' | 'MONTHLY'. [dia]: 1 = segunda ... 7 = domingo.
+  /// [recurso]: som do Lembra (arquivo em res/raw, sem extensão).
+  /// [uri]: som do próprio celular. Se os dois forem nulos, toca o alarme padrão.
   Future<void> agendar({
     required String chave,
     required String itemId,
@@ -65,6 +67,8 @@ class AlarmeNativo {
     int diaMes = 0,
     int hora = 0,
     int minuto = 0,
+    String? recurso,
+    String? uri,
   }) =>
       _chamar<bool>('agendar', {
         'chave': chave,
@@ -77,6 +81,8 @@ class AlarmeNativo {
         'diaMes': diaMes,
         'hora': hora,
         'minuto': minuto,
+        'recurso': recurso,
+        'uri': uri,
       });
 
   Future<void> cancelarItem(String itemId) => _chamar<bool>('cancelarItem', {'itemId': itemId});

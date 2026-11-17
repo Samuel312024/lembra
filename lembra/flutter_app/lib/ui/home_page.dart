@@ -21,6 +21,7 @@ import 'settings_page.dart';
 import 'theme/app_theme.dart';
 import 'voice_flow.dart';
 import 'widgets/link_linha.dart';
+import 'widgets/proximo_card.dart';
 import 'widgets/ui_kit.dart';
 import '../services/compartilhar_app.dart';
 
@@ -390,7 +391,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
         child: SectionHeader(titulo, count: quantidade),
       );
 
-  Widget _vazio() => Center(
+  Widget _vazio({String titulo = 'Nada por aqui'}) => Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
@@ -399,7 +400,7 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
               const IconBadge(icon: Icons.mic_none_rounded, color: AppColors.orange, size: 72),
               const SizedBox(height: 16),
               Text(
-                'Nada por aqui',
+                titulo,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 8),
@@ -599,25 +600,59 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
     );
   }
 
+  /// Resumo do dia: card "Próximo" (item em destaque com contagem regressiva e
+  /// ações rápidas) e, abaixo, "Pendentes hoje" e "Contas a vencer".
   Widget _resumoDoDia(List<Item> itens, DateTime agora) {
     final todos = agruparHoje(itens, agora);
     final feitos = todos.feitos.length;
     final atrasados = todos.atrasados.length;
     final pendentes = atrasados + todos.hoje.length;
     final total = pendentes + feitos;
-    final progresso = total == 0 ? 0.0 : feitos / total;
-    final titulo = atrasados > 0
-        ? 'Há itens atrasados'
-        : (feitos == total ? 'Dia concluído' : 'Dia sob controle');
 
-    final proximo = _proximoAlarme(itens, agora);
-    final quando = proximo?.ancora;
+    bool temHora(Item i) =>
+        i.ancora != null && (i.ancora!.hour != 0 || i.ancora!.minute != 0);
+
+    // Item em destaque: o mais atrasado (com horário); se não houver, o próximo
+    // alarme; por último, qualquer pendente de hoje sem horário.
+    final atrasadosComHora = todos.atrasados.where(temHora).toList()
+      ..sort((a, b) => a.ancora!.compareTo(b.ancora!));
+    final Item? destaque = atrasadosComHora.isNotEmpty
+        ? atrasadosComHora.first
+        : (_proximoAlarme(itens, agora) ??
+            (todos.atrasados.isNotEmpty ? todos.atrasados.first : null) ??
+            (todos.hoje.isNotEmpty ? todos.hoje.first : null));
+
+    final quando = destaque?.ancora;
+    final comHora = destaque != null && temHora(destaque);
+    final destaqueAtrasado =
+        destaque != null && todos.atrasados.any((i) => i.id == destaque.id);
+    final String? subtitulo = quando == null
+        ? null
+        : toBeginningOfSentenceCase(
+            quandoCurto(quando, comHora: comHora, agora: agora),
+          );
+
+    final c = context.cores;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Column(
         children: [
-          DayGauge(progress: progresso, done: feitos, total: total, title: titulo),
+          ProximoCard(
+            titulo: destaque?.titulo,
+            horario: comHora ? quando : null,
+            subtitulo: subtitulo,
+            categoria: destaque?.tipo.rotulo,
+            atrasado: destaqueAtrasado,
+            concluidos: feitos,
+            total: total,
+            onTap: destaque == null ? null : () => _abrirDetalhes(destaque),
+            onConcluir: destaque == null ? null : () => _concluir(destaque),
+            onEditar: destaque == null ? null : () => _editar(destaque),
+            onAbrirLink: (destaque != null && destaque.links.isNotEmpty)
+                ? () => abrirLink(context, destaque.links.first)
+                : null,
+          ),
           const SizedBox(height: 12),
           IntrinsicHeight(
             child: Row(
@@ -625,14 +660,16 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
               children: [
                 Expanded(
                   child: StatCard(
-                    icon: Icons.alarm_rounded,
-                    iconColor: AppColors.orange,
-                    label: proximo?.titulo ?? 'Próximo alarme',
-                    value: quando == null ? '--:--' : DateFormat.Hm('pt_BR').format(quando),
-                    valueColor: context.cores.marca,
-                    caption: quando == null
-                        ? 'Nenhum alarme à frente'
-                        : 'Próximo alarme • ${quandoCurto(quando, comHora: false, agora: agora)}',
+                    icon: Icons.checklist_rounded,
+                    iconColor: AppColors.green,
+                    label: 'Pendentes hoje',
+                    value: '$pendentes',
+                    valueColor: atrasados > 0 ? c.perigo : c.marca,
+                    caption: pendentes == 0
+                        ? 'Nada pendente'
+                        : atrasados > 0
+                            ? (atrasados == 1 ? '1 atrasado' : '$atrasados atrasados')
+                            : (feitos > 0 ? '$feitos já concluídos' : 'Nenhum atrasado'),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -648,7 +685,19 @@ class _HomePageState extends ConsumerState<HomePage> with WidgetsBindingObserver
   Widget _abaHoje(List<Item> itens) {
     final agora = DateTime.now();
     final todos = agruparHoje(itens, agora);
-    if (todos.vazio) return _vazio();
+
+    // O resumo do dia (card Próximo, pendentes e contas a vencer) fica sempre
+    // visível, mesmo sem nada para hoje: o próximo alarme e as contas a vencer
+    // olham além de hoje e continuam úteis. O aviso de "dia vazio" vem abaixo.
+    if (todos.vazio) {
+      return ListView(
+        padding: const EdgeInsets.only(bottom: 200),
+        children: [
+          _resumoDoDia(itens, agora),
+          _vazio(titulo: 'Nada para hoje'),
+        ],
+      );
+    }
 
     final g = _filtro == null ? todos : agruparHoje(itens, agora, filtro: _filtro);
 

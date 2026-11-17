@@ -103,6 +103,8 @@ class MainActivity : FlutterActivity() {
                             diaMes = call.argument<Number>("diaMes")?.toInt() ?: 0,
                             hora = call.argument<Number>("hora")?.toInt() ?: 0,
                             minuto = call.argument<Number>("minuto")?.toInt() ?: 0,
+                            recurso = call.argument<String>("recurso"),
+                            uri = call.argument<String>("uri"),
                         )
                         AlarmeStore.agendar(ctx, slot)
                         result.success(true)

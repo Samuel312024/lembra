@@ -3,8 +3,13 @@
 // Lista das contas em aberto, com o total em reais e filtro por tipo de conta.
 // Abre ao tocar no card "Contas a vencer" da tela inicial.
 //
-// Novo: cartão "Contas do mês × renda" (CLT ou PJ) com margem vermelha e
+// Cartão "Contas do mês × renda" (CLT ou PJ) com margem vermelha e
 // opção de salvar o relatório em PDF ou imagem.
+//
+// Novo: aviso logo abaixo do cartão quando existem contas sem data. Elas não
+// entram no percentual nem na sobra (só contas com vencimento no mês entram),
+// então o aviso explica isso, mostra o valor que ficou de fora e leva o usuário
+// direto para a seção "Sem data".
 
 import 'dart:io' show File;
 
@@ -43,9 +48,21 @@ class _ContasPageState extends ConsumerState<ContasPage> {
   /// Marca o cartão de renda para tirar o "print" (imagem).
   final _capturaKey = GlobalKey();
 
-  // >>> AJUSTE AQUI: nome do campo de data/vencimento do Item (aqui: `quando`).
+  /// Controla a rolagem da lista (usado pelo botão "Ver contas sem data").
+  final _scroll = ScrollController();
+
+  /// Marca o cabeçalho da seção "Sem data" para o aviso poder rolar até ela.
+  final _semDataKey = GlobalKey();
+
+  // >>> AJUSTE AQUI: nome do campo de data/vencimento do Item (aqui: `ancora`).
   // É a única linha que depende de um campo que eu não vi no seu modelo.
   DateTime? _dataDe(Item i) => i.ancora;
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   /// Contas em aberto que vencem até o fim do mês atual (inclui as já vencidas).
   List<Item> _contasDoMes(Iterable<Item> abertas, DateTime agora) {
@@ -55,6 +72,14 @@ class _ContasPageState extends ConsumerState<ContasPage> {
         if (_dataDe(i) case final d? when d.isBefore(fimDoMes)) i,
     ];
   }
+
+  /// Contas em aberto sem data de vencimento: ficam fora do comparativo com a
+  /// renda. Usa o mesmo `_dataDe` de `_contasDoMes`, então o aviso sempre bate
+  /// com o que realmente foi excluído da soma.
+  List<Item> _contasSemData(Iterable<Item> abertas) => [
+        for (final i in abertas)
+          if (_dataDe(i) == null) i,
+      ];
 
   Future<void> _nova() async {
     final d = await Navigator.of(context).push<Draft>(
@@ -116,6 +141,37 @@ class _ContasPageState extends ConsumerState<ContasPage> {
     }
   }
 
+  /// Rola a lista até a seção "Sem data".
+  Future<void> _irParaSemData() async {
+    // Um filtro por tipo pode esconder a seção: volta para "Todas" primeiro.
+    if (_filtro != null) {
+      setState(() => _filtro = null);
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+    }
+
+    var alvo = _semDataKey.currentContext;
+    if (alvo == null && _scroll.hasClients) {
+      // O ListView monta os itens sob demanda: desce até o fim para a seção existir.
+      await _scroll.animateTo(
+        _scroll.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+      if (!mounted) return;
+      alvo = _semDataKey.currentContext;
+    }
+
+    if (alvo != null && alvo.mounted) {
+      await Scrollable.ensureVisible(
+        alvo,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+        alignment: 0.08,
+      );
+    }
+  }
+
   ItemTile _tile(Item i) => ItemTile(
         key: ValueKey('conta-${i.id}'),
         item: i,
@@ -124,9 +180,10 @@ class _ContasPageState extends ConsumerState<ContasPage> {
         onCancelar: () => _cancelar(i),
       );
 
-  Widget _secao(String titulo, List<Item> lista, {Color? corTotal}) {
+  Widget _secao(String titulo, List<Item> lista, {Color? corTotal, Key? chave}) {
     final total = ResumoContas.somaDe(lista);
     return Padding(
+      key: chave,
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
       child: Row(
         children: [
@@ -237,8 +294,104 @@ class _ContasPageState extends ConsumerState<ContasPage> {
         labelStyle: TextStyle(fontWeight: FontWeight.w600, color: context.cores.texto),
       );
 
-  /// Cartão "Contas do mês × renda" + ações (editar renda, PDF, imagem, salvos).
-  Widget _comparativo(PerfilRenda? perfil, double gasto, List<Item> doMes, DateTime agora) {
+  /// Aviso exibido abaixo do cartão de renda quando há contas sem data.
+  ///
+  /// Explica por que o percentual pode estar subestimado, mostra quanto ficou
+  /// de fora e oferece o atalho para corrigir. Fica FORA do RepaintBoundary de
+  /// propósito: é um elemento interativo e não deve entrar na imagem salva.
+  Widget _avisoSemData(List<Item> semData, PerfilRenda perfil, double gasto) {
+    final t = Theme.of(context).textTheme;
+    final n = semData.length;
+    final total = ResumoContas.somaDe(semData);
+    final renda = perfil.rendaMensal;
+
+    // Cenário "e se todas vencerem neste mês": só faz sentido com valor e renda.
+    final projecao = (total > 0 && renda > 0) ? ((gasto + total) / renda * 100).round() : null;
+
+    final titulo = n == 1 ? '1 conta sem data ficou fora do cálculo' : '$n contas sem data ficaram fora do cálculo';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 6),
+        decoration: BoxDecoration(
+          color: AppColors.yellow.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.yellow.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const IconBadge(icon: Icons.event_busy_rounded, color: AppColors.yellow, size: 36),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(titulo, style: t.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Text(
+                    'O percentual da renda e a sobra consideram apenas contas com '
+                    'vencimento neste mês. Informe a data de cada conta para incluí-las.',
+                    style: t.bodySmall?.copyWith(color: context.cores.suave, height: 1.35),
+                  ),
+                  if (projecao != null) ...[
+                    const SizedBox(height: 8),
+                    Text.rich(
+                      TextSpan(
+                        style: t.bodySmall?.copyWith(color: context.cores.suave, height: 1.35),
+                        children: [
+                          const TextSpan(text: 'Se vencerem neste mês, somariam '),
+                          TextSpan(
+                            text: formatarReais(total),
+                            // 90% = mesmo limite da "margem vermelha" do cartão.
+                            // Se ele vier de uma constante em renda.dart, use-a aqui.
+                            style: AppText.mono(
+                              size: 12,
+                              color: projecao > 90 ? context.cores.perigo : context.cores.texto,
+                            ),
+                          ),
+                          TextSpan(text: ' ($projecao% da renda).'),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 2),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _irParaSemData,
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
+                      iconAlignment: IconAlignment.end,
+                      label: const Text('Ver contas sem data'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: context.cores.marca,
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 36),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        textStyle: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Cartão "Contas do mês × renda" + aviso de contas sem data + ações
+  /// (editar renda, PDF, imagem, salvos).
+  Widget _comparativo(
+    PerfilRenda? perfil,
+    double gasto,
+    List<Item> doMes,
+    List<Item> semData,
+    DateTime agora,
+  ) {
     final dados = (perfil == null || perfil.rendaMensal <= 0)
         ? null
         : DadosRelatorio(
@@ -272,6 +425,7 @@ class _ContasPageState extends ConsumerState<ContasPage> {
               ),
             ),
           ),
+          if (perfil != null && dados != null && semData.isNotEmpty) _avisoSemData(semData, perfil, gasto),
           Padding(
             padding: const EdgeInsets.only(left: 8),
             child: Wrap(
@@ -346,6 +500,7 @@ class _ContasPageState extends ConsumerState<ContasPage> {
     final rendaAsync = ref.watch(rendaProvider);
     final perfil = rendaAsync.value;
     final doMes = _contasDoMes(todas.abertas, agora);
+    final semDataRenda = _contasSemData(todas.abertas);
     final gastoMes = ResumoContas.somaDe(doMes);
 
     // Só oferece filtro para os tipos que existem entre as contas em aberto.
@@ -360,10 +515,11 @@ class _ContasPageState extends ConsumerState<ContasPage> {
     final r = filtro == null ? todas : ResumoContas.de(lista, agora, categoria: filtro);
 
     return ListView(
+      controller: _scroll,
       padding: const EdgeInsets.only(bottom: 120),
       children: [
         _resumo(r),
-        if (!rendaAsync.isLoading) _comparativo(perfil, gastoMes, doMes, agora),
+        if (!rendaAsync.isLoading) _comparativo(perfil, gastoMes, doMes, semDataRenda, agora),
         if (tipos.isNotEmpty)
           SizedBox(
             height: 56,
@@ -391,7 +547,7 @@ class _ContasPageState extends ConsumerState<ContasPage> {
           ...r.depois.map(_tile),
         ],
         if (r.semData.isNotEmpty) ...[
-          _secao('Sem data', r.semData),
+          _secao('Sem data', r.semData, chave: _semDataKey),
           ...r.semData.map(_tile),
         ],
       ],
