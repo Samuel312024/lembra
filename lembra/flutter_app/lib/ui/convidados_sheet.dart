@@ -3,6 +3,9 @@
 // Folha "Convidados": mostra quem aceitou, recusou ou ainda não respondeu,
 // envia o convite (WhatsApp ou e-mail), cobra quem não respondeu e deixa o
 // usuário registrar a resposta de cada pessoa com um toque.
+//
+// Com login, a reunião vai para o servidor: cada convidado recebe um link e a
+// resposta aparece aqui sozinha. Sem login, segue o jeito manual de sempre.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -60,10 +63,22 @@ IconData iconeResposta(RespostaConvite r) => switch (r) {
 // Folha
 // ---------------------------------------------------------------------------
 
-class FolhaConvidados extends ConsumerWidget {
+class FolhaConvidados extends ConsumerStatefulWidget {
   const FolhaConvidados({super.key, required this.agendamentoId});
 
   final String agendamentoId;
+
+  @override
+  ConsumerState<FolhaConvidados> createState() => _FolhaConvidadosState();
+}
+
+class _FolhaConvidadosState extends ConsumerState<FolhaConvidados> {
+  @override
+  void initState() {
+    super.initState();
+    // Traz as respostas dadas pelos links assim que a folha abre.
+    Future.microtask(() => ref.read(agendamentosProvider.notifier).atualizarRespostasDoServidor());
+  }
 
   Widget _barra(BuildContext context, Agendamento a) {
     final partes = <(int, Color)>[
@@ -87,11 +102,11 @@ class FolhaConvidados extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final registros = ref.watch(agendamentosProvider);
     Agendamento? encontrado;
     for (final x in registros) {
-      if (x.id == agendamentoId) {
+      if (x.id == widget.agendamentoId) {
         encontrado = x;
         break;
       }
@@ -110,6 +125,9 @@ class FolhaConvidados extends ConsumerWidget {
     final c = context.cores;
     final hm = DateFormat.Hm('pt_BR');
     final dia = toBeginningOfSentenceCase(DateFormat("EEE, d 'de' MMM", 'pt_BR').format(a.inicio)) ?? '';
+
+    final temGoogle = a.eventoId != null && a.convidados.any((g) => g.canal == CanalConvite.email);
+    final temServidor = a.remotoId != null;
 
     return SafeArea(
       child: ConstrainedBox(
@@ -145,19 +163,19 @@ class FolhaConvidados extends ConsumerWidget {
                   a.resumoRespostas,
                   style: t.bodySmall?.copyWith(color: c.suave, fontWeight: FontWeight.w600),
                 ),
-                if (a.eventoId != null && a.convidados.any((g) => g.canal == CanalConvite.email))
+                if (temGoogle || temServidor)
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
                       onPressed: () async {
                         final messenger = ScaffoldMessenger.of(context);
-                        await ref.read(agendamentosProvider.notifier).sincronizarComCalendario();
-                        messenger.showSnackBar(const SnackBar(
-                          content: Text('Respostas do Google Agenda atualizadas.'),
-                        ));
+                        final notificador = ref.read(agendamentosProvider.notifier);
+                        await notificador.sincronizarComCalendario();
+                        await notificador.atualizarRespostasDoServidor();
+                        messenger.showSnackBar(const SnackBar(content: Text('Respostas atualizadas.')));
                       },
                       icon: const Icon(Icons.sync_rounded, size: 18),
-                      label: const Text('Atualizar respostas do e-mail'),
+                      label: const Text('Atualizar respostas'),
                       style: TextButton.styleFrom(
                         foregroundColor: c.marca,
                         padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -210,9 +228,39 @@ class _TileConvidado extends ConsumerWidget {
       };
 
   Future<void> _enviar(BuildContext context, WidgetRef ref) async {
-    final lembrete = convidado.conviteEnviadoEm != null;
     final messenger = ScaffoldMessenger.of(context);
-    final ok = await ConviteService.enviar(agendamento, convidado, lembrete: lembrete);
+    final notificador = ref.read(agendamentosProvider.notifier);
+    final lembrete = convidado.conviteEnviadoEm != null;
+
+    // Com login, a reunião vai para o servidor: os convidados ganham um link e a
+    // resposta chega sozinha. Sem login ou sem conexão, segue o jeito manual de sempre.
+    final servidor = await notificador.garantirNoServidor(agendamento.id);
+    if (servidor.estado == EstadoServidor.falhou && servidor.mensagem != null) {
+      messenger.showSnackBar(SnackBar(content: Text('${servidor.mensagem} Enviando do jeito manual.')));
+    }
+
+    // Depois do await, os objetos antigos ficaram velhos: pega os atuais (com o link).
+    final reuniao = notificador.porId(agendamento.id) ?? agendamento;
+    final fresco = notificador.convidadoAtual(agendamento.id, convidado.id) ?? convidado;
+
+    final noServidor = servidor.ok && reuniao.remotoId != null && fresco.remotoId != null;
+    if (noServidor && fresco.canal == CanalConvite.email) {
+      if (servidor.criou) {
+        // O servidor acabou de mandar o e-mail com o link.
+        if (fresco.conviteEnviadoEm != null) {
+          messenger.showSnackBar(const SnackBar(content: Text('Convite enviado por e-mail.')));
+          return;
+        }
+      } else if (lembrete) {
+        final r = await notificador.reenviarPeloServidor(agendamento.id, convidado.id);
+        messenger.showSnackBar(SnackBar(content: Text(r.mensagem ?? 'Lembrete enviado por e-mail.')));
+        return;
+      }
+    }
+
+    // WhatsApp (com o link, se o servidor já conhece a pessoa) ou e-mail que o
+    // servidor não enviou: abre o app com o texto pronto.
+    final ok = await ConviteService.enviar(reuniao, fresco, lembrete: lembrete);
     if (!ok) {
       messenger.showSnackBar(SnackBar(
         content: Text(convidado.canal == CanalConvite.email
@@ -221,7 +269,7 @@ class _TileConvidado extends ConsumerWidget {
       ));
       return;
     }
-    await ref.read(agendamentosProvider.notifier).marcarEnviado(agendamento.id, convidado.id);
+    await notificador.marcarEnviado(agendamento.id, convidado.id);
   }
 
   @override
@@ -329,7 +377,10 @@ class _TileConvidado extends ConsumerWidget {
   /// Explica de onde vem (ou virá) a resposta, para ninguém ficar esperando à toa.
   String _legenda(bool email) {
     if (convidado.automatica) return 'Respondeu pelo Google Agenda';
-    if (convidado.resposta != RespostaConvite.pendente) return 'Resposta registrada por você';
+    if (convidado.resposta != RespostaConvite.pendente) {
+      return convidado.remotoId != null ? 'Resposta registrada' : 'Resposta registrada por você';
+    }
+    if (convidado.link != null) return 'A resposta aparece aqui quando a pessoa tocar no link.';
     return email
         ? 'O Google Agenda atualiza aqui quando a pessoa responder.'
         : 'Registre a resposta quando ela chegar no WhatsApp.';

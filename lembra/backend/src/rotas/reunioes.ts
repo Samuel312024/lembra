@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { IaIndisponivel, chamarLLM, extrairJson } from '../llm.js';
-
+import { sendToMake } from '../servicos/make.js';
 /**
  * Transcrição de áudio (Fase 3). O provedor fica atrás desta interface para trocar
  * entre Whisper, Deepgram ou AssemblyAI sem mexer no resto do sistema.
@@ -55,7 +55,18 @@ export async function rotasReunioes(app: FastifyInstance) {
     const { transcricao, agora, fuso } = corpoEsquema.parse(req.body);
     try {
       const bruto = await chamarLLM(SISTEMA, JSON.stringify({ agora, fuso, transcricao }), 2000);
-      return resultadoEsquema.parse(extrairJson(bruto));
+      const resultado = resultadoEsquema.parse(extrairJson(bruto));
+
+      // avisa o Make sem esperar a resposta dele
+      void sendToMake('meeting.extracted', {
+        agora,
+        fuso,
+        decisoes: resultado.decisoes,
+        tarefas: resultado.tarefas,
+        duvidas: resultado.duvidas,
+      });
+
+      return resultado;
     } catch (e) {
       if (e instanceof IaIndisponivel) return reply.code(503).send({ erro: 'ia_indisponivel' });
       req.log.warn({ err: e }, 'falha ao extrair tarefas da reunião');

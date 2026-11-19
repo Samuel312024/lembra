@@ -18,7 +18,15 @@ class ApiErro implements Exception {
         'credenciais_invalidas' => 'E-mail ou senha incorretos.',
         'limite_diario' => 'Limite diário de interpretações por IA atingido.',
         'dados_invalidos' => 'Dados inválidos. Confira o e-mail e use uma senha com 8+ caracteres.',
-        _ => 'Não foi possível falar com o servidor.',
+        'inicio_no_passado' => 'Para enviar convites, a reunião precisa ser no futuro.',
+        'limite_diario_convites' => 'Limite diário de convites atingido.',
+        'reuniao_cancelada' => 'Esta reunião já foi cancelada.',
+        'reuniao_encerrada' => 'Esta reunião já aconteceu.',
+        'limite_participantes' => 'Uma reunião aceita no máximo 50 convidados.',
+        'participante_nao_encontrado' => 'Esse convidado não está mais na reunião.',
+        _ => status == 401
+            ? 'Entre na sua conta para usar os convites automáticos.'
+            : 'Não foi possível falar com o servidor.',
       };
 }
 
@@ -73,6 +81,33 @@ class ApiClient {
     return _corpo(r);
   }
 
+  Future<Map<String, dynamic>> _get(
+    String caminho, {
+    Duration limite = const Duration(seconds: 15),
+  }) async {
+    final r = await _http.get(Uri.parse('$baseUrl$caminho'), headers: await _cabecalhos()).timeout(limite);
+    return _corpo(r);
+  }
+
+  Future<Map<String, dynamic>> _patch(
+    String caminho,
+    Map<String, Object?> corpo, {
+    Duration limite = const Duration(seconds: 15),
+  }) async {
+    final r = await _http
+        .patch(Uri.parse('$baseUrl$caminho'), headers: await _cabecalhos(), body: jsonEncode(corpo))
+        .timeout(limite);
+    return _corpo(r);
+  }
+
+  Future<Map<String, dynamic>> _apagar(
+    String caminho, {
+    Duration limite = const Duration(seconds: 15),
+  }) async {
+    final r = await _http.delete(Uri.parse('$baseUrl$caminho'), headers: await _cabecalhos()).timeout(limite);
+    return _corpo(r);
+  }
+
   Future<Map<String, dynamic>> registrar(String email, String senha) =>
       _post('/auth/registrar', {'email': email, 'senha': senha}, auth: false);
 
@@ -95,6 +130,31 @@ class ApiClient {
   Future<Map<String, dynamic>> sincronizar(int desde, List<Map<String, Object?>> itens) =>
       _post('/sync', {'desde': desde, 'itens': itens});
 
+  // -------------------------------------------------------------------------
+  // Convites (reuniões com resposta automática)
+  // O envio de e-mails acontece no servidor e pode demorar, por isso o limite maior.
+  // -------------------------------------------------------------------------
+
+  /// Cria a reunião no servidor: grava os convidados, envia os e-mails e devolve
+  /// o link de resposta de cada pessoa.
+  Future<Map<String, dynamic>> criarConvite(Map<String, Object?> corpo) =>
+      _post('/convites', corpo, limite: const Duration(seconds: 30));
+
+  /// Reuniões dos últimos 30 dias em diante, com as respostas atuais. Vem em {"reunioes": [...]}.
+  Future<Map<String, dynamic>> listarConvites() => _get('/convites');
+
+  /// Edita título, início, local ou descrição. Mudou o horário? O servidor zera as respostas.
+  Future<Map<String, dynamic>> editarConvite(String id, Map<String, Object?> corpo) =>
+      _patch('/convites/$id', corpo, limite: const Duration(seconds: 30));
+
+  /// Cancela a reunião e avisa os convidados.
+  Future<Map<String, dynamic>> cancelarConvite(String id) =>
+      _apagar('/convites/$id', limite: const Duration(seconds: 30));
+
+  /// Reenvia o convite: para um convidado ([participanteId]) ou para todos que não responderam.
+  Future<Map<String, dynamic>> reenviarConvite(String id, {String? participanteId}) =>
+      _post('/convites/$id/reenviar', {if (participanteId != null) 'participanteId': participanteId});
+
   /// Exclusão total dos dados da conta (LGPD).
   Future<void> excluirConta() async {
     final r = await _http
@@ -102,4 +162,9 @@ class ApiClient {
         .timeout(const Duration(seconds: 15));
     if (r.statusCode >= 400) throw ApiErro(r.statusCode, 'erro');
   }
+
+    /// Inclui convidados numa reunião que já está no servidor. Só os novos recebem o e-mail;
+  /// devolve a reunião completa, com o link de cada convidado.
+  Future<Map<String, dynamic>> adicionarParticipantes(String id, Map<String, Object?> corpo) =>
+      _post('/convites/$id/participantes', corpo, limite: const Duration(seconds: 30));
 }

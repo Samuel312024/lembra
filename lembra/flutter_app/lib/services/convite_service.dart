@@ -1,8 +1,10 @@
 // Coloque em: lib/services/convite_service.dart
 //
 // Monta a mensagem do convite e abre o WhatsApp ou o app de e-mail já com o
-// texto pronto. O app não consegue ler a resposta sozinho: quem responde manda
-// SIM / NÃO / TALVEZ e o usuário registra a resposta no cartão da reunião.
+// texto pronto. Quando o convidado tem um link de resposta do servidor, a
+// mensagem manda o link e a resposta é registrada sozinha. Sem link, quem
+// responde manda SIM / NÃO / TALVEZ e o usuário registra a resposta no cartão
+// da reunião.
 
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -35,18 +37,26 @@ class ConviteService {
   static String mensagemConvite(Agendamento a, {Convidado? para}) {
     final wa = para == null || para.canal == CanalConvite.whatsapp;
     final saudacao = para == null ? 'Olá!' : 'Olá, ${para.primeiroNome}!';
+    final link = para?.link;
+    final pedido = (link != null && link.isNotEmpty)
+        ? 'Pode confirmar sua presença? É só tocar no link e escolher:\n$link'
+        : 'Pode confirmar sua presença? Responda ${_n('SIM', wa)}, ${_n('NÃO', wa)} ou ${_n('TALVEZ', wa)}.';
     return '$saudacao Você foi convidado(a) para uma reunião:\n\n'
         '${_detalhes(a, wa)}\n\n'
-        'Pode confirmar sua presença? Responda ${_n('SIM', wa)}, ${_n('NÃO', wa)} ou ${_n('TALVEZ', wa)}.';
+        '$pedido';
   }
 
   /// Segundo toque, para quem ainda não respondeu.
   static String mensagemLembrete(Agendamento a, Convidado para) {
     final wa = para.canal == CanalConvite.whatsapp;
     final hm = DateFormat.Hm('pt_BR');
+    final link = para.link;
+    final pedido = (link != null && link.isNotEmpty)
+        ? 'É só tocar no link para responder:\n$link'
+        : 'Pode responder ${_n('SIM', wa)}, ${_n('NÃO', wa)} ou ${_n('TALVEZ', wa)}?';
     return 'Olá, ${para.primeiroNome}! Só passando para lembrar de confirmar sua presença em '
         '${_n(a.titulo, wa)}, ${_dia(a.inicio)} às ${hm.format(a.inicio)}.\n\n'
-        'Pode responder ${_n('SIM', wa)}, ${_n('NÃO', wa)} ou ${_n('TALVEZ', wa)}?';
+        '$pedido';
   }
 
   /// Link que abre a conversa já com o texto. Null se o contato for inválido.

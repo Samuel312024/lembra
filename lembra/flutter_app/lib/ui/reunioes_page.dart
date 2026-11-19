@@ -363,8 +363,12 @@ class _ReunioesPageState extends ConsumerState<ReunioesPage> with WidgetsBinding
   Future<void> _excluir(_ReuniaoView v) async {
     final a = v.agendamento;
     if (a == null) return;
-    final temEventoNoCalendario = a.eventoId != null && a.calendarioId != null;
+        final temEventoNoCalendario = a.eventoId != null && a.calendarioId != null;
+    // Só reunião que ainda vai acontecer é cancelada no servidor: apagar uma antiga
+    // do histórico não manda aviso a ninguém.
+    final temNoServidor = a.remotoId != null && !v.encerrada(DateTime.now());
     var removerDoCalendario = temEventoNoCalendario;
+    var cancelarNoServidor = temNoServidor;
     final hm = DateFormat.Hm('pt_BR');
 
     final confirmou = await showDialog<bool>(
@@ -379,14 +383,31 @@ class _ReunioesPageState extends ConsumerState<ReunioesPage> with WidgetsBinding
               Text(v.titulo, style: const TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),
               Text('${_tituloDia(v.inicio, DateTime.now())}, ${hm.format(v.inicio)}'),
-              if (temEventoNoCalendario) ...[
-                const SizedBox(height: 8),
+                            if (temEventoNoCalendario || temNoServidor) const SizedBox(height: 8),
+              if (temEventoNoCalendario)
                 CheckboxListTile(
                   value: removerDoCalendario,
                   onChanged: (x) => setLocal(() => removerDoCalendario = x ?? false),
                   contentPadding: EdgeInsets.zero,
                   controlAffinity: ListTileControlAffinity.leading,
                   title: const Text('Remover também do calendário do celular'),
+                ),
+              if (temNoServidor)
+                CheckboxListTile(
+                  value: cancelarNoServidor,
+                  onChanged: (x) => setLocal(() => cancelarNoServidor = x ?? false),
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: const Text('Cancelar e avisar os convidados'),
+                ),
+              if (cancelarNoServidor) ...[
+                const SizedBox(height: 8),
+                CheckboxListTile(
+                  value: cancelarNoServidor,
+                  onChanged: (x) => setLocal(() => cancelarNoServidor = x ?? false),
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: const Text('Cancelar também no servidor'),
                 ),
               ],
             ],
@@ -409,6 +430,7 @@ class _ReunioesPageState extends ConsumerState<ReunioesPage> with WidgetsBinding
     // Só apaga do calendário depois que a janela do "Desfazer" fechar.
     final eventoId = removerDoCalendario ? a.eventoId : null;
     final calendarioId = removerDoCalendario ? a.calendarioId : null;
+    final remotoId = cancelarNoServidor ? a.remotoId : null;
 
     await notifier.excluir(a.id);
     if (eventoId != null && calendarioId != null && mounted) {
@@ -427,8 +449,15 @@ class _ReunioesPageState extends ConsumerState<ReunioesPage> with WidgetsBinding
       ),
     ));
 
-    final motivo = await aviso.closed;
-    if (motivo == SnackBarClosedReason.action) return;
+        final motivo = await aviso.closed;
+    if (motivo == SnackBarClosedReason.action) return; // desfez: nada sai do aparelho
+
+    if (remotoId != null) {
+      final r = await notifier.cancelarNoServidor(remotoId);
+      if (mounted && r.estado == EstadoServidor.falhou) {
+        _aviso(r.mensagem ?? 'Não consegui cancelar no servidor.');
+      }
+    }
     if (eventoId != null && calendarioId != null) {
       await EventoCalendario().excluir(calendarioId, eventoId);
       if (!mounted) return;

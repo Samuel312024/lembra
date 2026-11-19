@@ -6,7 +6,9 @@ import { ZodError } from 'zod';
 import { config } from './config.js';
 import './db.js';
 import { rotasAuth } from './rotas/auth.js';
+import { rotasConvites } from './rotas/convites.js';
 import { rotasIa } from './rotas/ia.js';
+import { rotasResposta } from './rotas/resposta.js';
 import { rotasReunioes } from './rotas/reunioes.js';
 import { rotasSync } from './rotas/sync.js';
 
@@ -51,5 +53,7 @@ await app.register(rotasAuth);
 await app.register(rotasSync);
 await app.register(rotasIa);
 await app.register(rotasReunioes);
+await app.register(rotasConvites);
+await app.register(rotasResposta);
 
 await app.listen({ port: config.PORT, host: '0.0.0.0' });

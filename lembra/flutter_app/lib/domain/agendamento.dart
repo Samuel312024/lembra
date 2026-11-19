@@ -81,6 +81,8 @@ class Convidado {
     this.conviteEnviadoEm,
     this.respondidoEm,
     this.automatica = false,
+    this.remotoId,
+    this.link,
   }) : id = id ?? const Uuid().v4();
 
   final String id;
@@ -94,6 +96,12 @@ class Convidado {
 
   /// true = a resposta veio sozinha do Google Agenda; false = registrada pelo usuário.
   bool automatica;
+
+  /// Id deste convidado no backend (preenchido depois de POST /convites).
+  String? remotoId;
+
+  /// Link de resposta gerado pelo backend. Vai na mensagem do WhatsApp no lugar de "responda SIM/NÃO".
+  String? link;
 
   CanalConvite get canal => contato.contains('@') ? CanalConvite.email : CanalConvite.whatsapp;
 
@@ -118,6 +126,8 @@ class Convidado {
         conviteEnviadoEm: conviteEnviadoEm,
         respondidoEm: respondidoEm,
         automatica: automatica,
+        remotoId: remotoId,
+        link: link,
       );
 
   Map<String, Object?> toJson() => {
@@ -128,6 +138,8 @@ class Convidado {
         'convite_enviado_em': conviteEnviadoEm?.millisecondsSinceEpoch,
         'respondido_em': respondidoEm?.millisecondsSinceEpoch,
         'automatica': automatica,
+        'remoto_id': remotoId,
+        'link': link,
       };
 
   factory Convidado.fromJson(Map<String, dynamic> j) => Convidado(
@@ -138,6 +150,8 @@ class Convidado {
         conviteEnviadoEm: _dt(j['convite_enviado_em']),
         respondidoEm: _dt(j['respondido_em']),
         automatica: (j['automatica'] as bool?) ?? false,
+        remotoId: j['remoto_id'] as String?,
+        link: j['link'] as String?,
       );
 }
 
@@ -158,6 +172,7 @@ class Agendamento {
     List<Convidado>? convidados,
     required this.criadoEm,
     required this.atualizadoEm,
+    this.remotoId,
   }) : convidados = convidados ?? [];
 
   final String id;
@@ -166,6 +181,9 @@ class Agendamento {
   String? eventoId;
   String? calendarioId;
   String calendarioNome;
+
+  /// Id da reunião no backend (preenchido depois de POST /convites).
+  String? remotoId;
 
   String titulo;
   DateTime inicio;
@@ -219,6 +237,7 @@ class Agendamento {
         convidados: [for (final c in convidados) c.copiar()],
         criadoEm: criadoEm,
         atualizadoEm: atualizadoEm,
+        remotoId: remotoId,
       );
 
   Map<String, Object?> toJson() => {
@@ -233,6 +252,7 @@ class Agendamento {
         'convidados': [for (final c in convidados) c.toJson()],
         'criado_em': criadoEm.millisecondsSinceEpoch,
         'atualizado_em': atualizadoEm.millisecondsSinceEpoch,
+        'remoto_id': remotoId,
       };
 
   factory Agendamento.fromJson(Map<String, dynamic> j) {
@@ -249,6 +269,7 @@ class Agendamento {
       convidados: [for (final e in lista) Convidado.fromJson((e as Map).cast<String, dynamic>())],
       criadoEm: _dt(j['criado_em']) ?? DateTime.now(),
       atualizadoEm: _dt(j['atualizado_em']) ?? DateTime.now(),
+      remotoId: j['remoto_id'] as String?,
     );
   }
 }

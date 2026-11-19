@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "988918824223",
+    "project_id": "lembra-a61c9",
+    "storage_bucket": "lembra-a61c9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:988918824223:android:83a87665a2858e9157842a",
+        "android_client_info": {
+          "package_name": "com.samsolution.mylembra"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBEcdoxpiDp6czoOG1PtsR65mAZXa2YcX4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:988918824223:android:15e3e59965ccd6e357842a",
+        "android_client_info": {
+          "package_name": "com.samsolution.mylembra.dev"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBEcdoxpiDp6czoOG1PtsR65mAZXa2YcX4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -8,9 +8,24 @@ import 'services/diagnostico.dart';
 import 'services/notification_service.dart';
 import 'state/providers.dart';
 import 'ui/acoes_notificacao.dart';
+import 'dart:async';
+
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+Future<void> _iniciarFirebase() async {
+  try {
+    await Firebase.initializeApp();
+    final token = await FirebaseMessaging.instance.getToken();
+    debugPrint('[push] FCM token: $token');
+  } catch (e) {
+    debugPrint('[push] Firebase indisponível: $e');
+  }
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  unawaited(_iniciarFirebase());
   final sw = Stopwatch()..start();
 
   // AJUSTE 1: as duas inicializações independentes rodam em paralelo
