@@ -1,3 +1,5 @@
+// Coloque em: lembra/backend/src/rotas/convites.ts  (substitui o arquivo atual)
+
 import { randomUUID } from 'node:crypto';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -393,10 +395,7 @@ export async function rotasConvites(app: FastifyInstance) {
     return { envio, ignoradosPorIntervalo: recentes.length };
   });
 
-  // -------------------------------------------------------------------------
-  // Aparelhos (push)
-  // -------------------------------------------------------------------------
-    // Inclui convidados numa reunião que já existe e manda o convite só para os novos.
+  // Inclui convidados numa reunião que já existe e manda o convite só para os novos.
   // Quem já está na reunião (mesmo e-mail ou mesmo telefone) é ignorado.
   app.post('/convites/:id/participantes', comLimite, async (req, reply) => {
     const { id } = idEsquema.parse(req.params);
@@ -408,8 +407,8 @@ export async function rotasConvites(app: FastifyInstance) {
     if (r.inicio < Date.now()) return reply.code(409).send({ erro: 'reuniao_encerrada' });
 
     const atuais = participantesDe(id);
-    const emails = new Set(atuais.flatMap((p) => (p.email ? [p.email] : [])));
-    const telefones = new Set(atuais.flatMap((p) => (p.telefone ? [p.telefone] : [])));
+    const emails = new Set<string>(atuais.flatMap((p) => (p.email ? [p.email] : [])));
+    const telefones = new Set<string>(atuais.flatMap((p) => (p.telefone ? [p.telefone] : [])));
     const novos = dados.participantes.filter((p) => {
       if (p.email) {
         if (emails.has(p.email)) return false;
@@ -465,6 +464,10 @@ export async function rotasConvites(app: FastifyInstance) {
     void sendToMake('meeting.updated', { ...paraMake(r, finais), inicioMudou: false, adicionados: novosComId.length });
     return reply.code(201).send({ ...serializar(r, finais), adicionados: novosComId.length, envio });
   });
+
+  // -------------------------------------------------------------------------
+  // Aparelhos (push)
+  // -------------------------------------------------------------------------
 
   app.post('/dispositivos', auth, async (req, reply) => {
     const { token, plataforma } = z

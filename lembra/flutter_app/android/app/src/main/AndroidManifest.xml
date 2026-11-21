@@ -33,10 +33,13 @@
     <uses-permission android:name="android.permission.READ_CALENDAR"/>
     <uses-permission android:name="android.permission.WRITE_CALENDAR"/>
 
+    <!-- usesCleartextTraffic: libera http:// para testar com o servidor no PC.
+         REMOVER quando o servidor estiver em https (obrigatório para publicar). -->
     <application
         android:label="lembra"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <!-- showWhenLocked/turnScreenOn foram removidos daqui: o MainActivity.kt
              liga isso só enquanto o alarme está tocando. -->
         <activity

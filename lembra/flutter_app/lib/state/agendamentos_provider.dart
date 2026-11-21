@@ -1,4 +1,4 @@
-// Coloque em: lib/state/agendamentos_provider.dart
+// Coloque em: lib/state/agendamentos_provider.dart  (substitui o arquivo atual)
 //
 // Histórico de reuniões agendadas pelo Lembra, salvo no aparelho (SharedPreferences).
 // Nada aqui apaga sozinho: um registro só sai quando o usuário exclui.
@@ -32,7 +32,7 @@ class ResultadoServidor {
   /// Texto em português para mostrar ao usuário, quando houver.
   final String? mensagem;
 
-  /// true = a reunião acabou de ser criada no servidor (e os e-mails saíram agora).
+  /// true = a reunião (ou convidados novos) acabou de ir para o servidor (e os e-mails saíram agora).
   final bool criou;
 
   bool get ok => estado == EstadoServidor.ok;
@@ -201,9 +201,10 @@ class AgendamentosNotifier extends Notifier<List<Agendamento>> {
   // Servidor de convites (precisa de login)
   // -------------------------------------------------------------------------
 
-  /// Garante que a reunião existe no servidor. Se ainda não existe, cria: o servidor
-  /// grava os convidados, manda o e-mail aos que têm e-mail e devolve o link de cada um.
-  /// Se já existe, não faz nada (editar é com [atualizar]).
+  /// Garante que a reunião e os convidados estão no servidor. Se a reunião ainda não existe,
+  /// cria: o servidor grava os convidados, manda o e-mail aos que têm e-mail e devolve o link
+  /// de cada um. Se já existe, envia só os convidados que ainda não estão lá.
+  /// Editar título, horário ou local é com [atualizar].
   Future<ResultadoServidor> garantirNoServidor(String agendamentoId) async {
     final api = ref.read(apiProvider);
     if (await api.token() == null) return const ResultadoServidor(EstadoServidor.semLogin);
@@ -212,7 +213,7 @@ class AgendamentosNotifier extends Notifier<List<Agendamento>> {
     if (a == null) {
       return const ResultadoServidor(EstadoServidor.falhou, mensagem: 'Esta reunião não existe mais.');
     }
-        if (a.remotoId != null) return _incluirNovosNoServidor(agendamentoId);
+    if (a.remotoId != null) return _incluirNovosNoServidor(agendamentoId);
 
     try {
       final remota = await api.criarConvite(ConviteRemoto.corpoCriar(a));
@@ -227,7 +228,7 @@ class AgendamentosNotifier extends Notifier<List<Agendamento>> {
     }
   }
 
-    /// Reunião que já está no servidor: manda só os convidados que ainda não estão lá.
+  /// Reunião que já está no servidor: manda só os convidados que ainda não estão lá.
   /// O servidor manda o e-mail aos novos que têm e-mail e devolve o link de cada um.
   Future<ResultadoServidor> _incluirNovosNoServidor(String agendamentoId) async {
     final a = _buscar(agendamentoId);

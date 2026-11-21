@@ -1,5 +1,11 @@
+// Coloque em: lib/ui/account_page.dart  (substitui o arquivo atual)
+
+import 'dart:async';
+import 'dart:io' show SocketException;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 
 import '../data/api_client.dart';
 import '../state/providers.dart';
@@ -26,18 +32,45 @@ class _AccountPageState extends ConsumerState<AccountPage> {
   }
 
   Future<void> _enviar({required bool criar}) async {
+    FocusScope.of(context).unfocus();
+    final email = _email.text.trim();
+    final senha = _senha.text;
+
+    // Confere no aparelho antes de chamar o servidor.
+    if (!email.contains('@') || !email.contains('.')) {
+      setState(() => _erro = 'Digite um e-mail válido.');
+      return;
+    }
+    if (senha.length < 8) {
+      setState(() => _erro = 'A senha precisa ter pelo menos 8 caracteres.');
+      return;
+    }
+
     setState(() {
       _ocupado = true;
       _erro = null;
     });
+
+    String? erro;
     try {
-      await ref.read(sessaoProvider.notifier).entrar(_email.text.trim(), _senha.text, criar: criar);
+      await ref.read(sessaoProvider.notifier).entrar(email, senha, criar: criar);
     } on ApiErro catch (e) {
-      _erro = e.mensagem;
+      erro = e.mensagem;
+    } on TimeoutException {
+      erro = 'O servidor demorou para responder. Tente de novo.';
+    } on SocketException {
+      erro = 'Sem conexão com o servidor. Confira a internet e tente de novo.';
+    } on http.ClientException {
+      erro = 'Sem conexão com o servidor. Confira a internet e tente de novo.';
     } catch (_) {
-      _erro = 'Não foi possível falar com o servidor. Confira a conexão.';
+      erro = 'Não foi possível falar com o servidor. Confira a conexão.';
     }
-    if (mounted) setState(() => _ocupado = false);
+
+    if (!mounted) return;
+    setState(() {
+      _ocupado = false;
+      _erro = erro;
+    });
   }
 
   @override
@@ -78,13 +111,19 @@ class _AccountPageState extends ConsumerState<AccountPage> {
             TextField(
               controller: _email,
               keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
               autocorrect: false,
+              enableSuggestions: false,
+              autofillHints: const [AutofillHints.email],
               decoration: const InputDecoration(labelText: 'E-mail', border: OutlineInputBorder()),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _senha,
               obscureText: true,
+              textInputAction: TextInputAction.done,
+              autofillHints: const [AutofillHints.password],
+              onSubmitted: (_) => _ocupado ? null : _enviar(criar: false),
               decoration: const InputDecoration(
                 labelText: 'Senha (mínimo 8 caracteres)',
                 border: OutlineInputBorder(),

@@ -1,3 +1,5 @@
+// Coloque em: lib/data/api_client.dart  (substitui o arquivo atual)
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -151,6 +153,11 @@ class ApiClient {
   Future<Map<String, dynamic>> cancelarConvite(String id) =>
       _apagar('/convites/$id', limite: const Duration(seconds: 30));
 
+  /// Inclui convidados numa reunião que já está no servidor. Só os novos recebem o e-mail;
+  /// devolve a reunião completa, com o link de cada convidado.
+  Future<Map<String, dynamic>> adicionarParticipantes(String id, Map<String, Object?> corpo) =>
+      _post('/convites/$id/participantes', corpo, limite: const Duration(seconds: 30));
+
   /// Reenvia o convite: para um convidado ([participanteId]) ou para todos que não responderam.
   Future<Map<String, dynamic>> reenviarConvite(String id, {String? participanteId}) =>
       _post('/convites/$id/reenviar', {if (participanteId != null) 'participanteId': participanteId});
@@ -162,9 +169,4 @@ class ApiClient {
         .timeout(const Duration(seconds: 15));
     if (r.statusCode >= 400) throw ApiErro(r.statusCode, 'erro');
   }
-
-    /// Inclui convidados numa reunião que já está no servidor. Só os novos recebem o e-mail;
-  /// devolve a reunião completa, com o link de cada convidado.
-  Future<Map<String, dynamic>> adicionarParticipantes(String id, Map<String, Object?> corpo) =>
-      _post('/convites/$id/participantes', corpo, limite: const Duration(seconds: 30));
 }
